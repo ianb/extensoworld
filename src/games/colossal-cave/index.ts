@@ -9,6 +9,15 @@ import { createItems } from "./items.js";
 import { createDoors } from "./doors.js";
 import { xyzzy, plugh, plover, fee, fie, foe, foo, oldMagic } from "./magic-words.js";
 import { catchBird, releaseBird, waterPlant, attackDragon, sayYes, feedBear } from "./puzzles.js";
+import { takeTreasureScoring, dropTreasureScoring } from "./scoring.js";
+import {
+  giveTroll,
+  takeBear,
+  dropBear,
+  bearFollows,
+  lanternDrain,
+  waveRod,
+} from "./puzzles-more.js";
 import { registerGame } from "../registry.js";
 
 registerGame({
@@ -21,8 +30,23 @@ registerGame({
     defineBaseProperties(registry);
     const store = new EntityStore(registry);
     const verbs = createDefaultVerbs();
-    const puzzleHandlers = [catchBird, releaseBird, waterPlant, attackDragon, sayYes, feedBear];
-    for (const handler of [xyzzy, plugh, plover, fee, fie, foe, foo, oldMagic, ...puzzleHandlers]) {
+    const allHandlers = [
+      catchBird,
+      releaseBird,
+      waterPlant,
+      attackDragon,
+      sayYes,
+      feedBear,
+      takeTreasureScoring,
+      dropTreasureScoring,
+      giveTroll,
+      takeBear,
+      dropBear,
+      bearFollows,
+      lanternDrain,
+      waveRod,
+    ];
+    for (const handler of [xyzzy, plugh, plover, fee, fie, foe, foo, oldMagic, ...allHandlers]) {
       verbs.register(handler);
     }
 

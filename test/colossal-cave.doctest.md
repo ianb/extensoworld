@@ -215,6 +215,73 @@ game.do("examine lamp")
 => Your lamp is here, gleaming brightly.
 ```
 
+## Troll Bridge
+
+Give a treasure to the troll to make him leave:
+
+```
+const tg = colossalCave();
+tg.runner.store.setProperty("player:1", { name: "location", value: "room:on-sw-side-of-chasm" });
+tg.runner.store.setProperty("item:eggs", { name: "location", value: "player:1" });
+tg.do("give eggs to troll");
+tg.locationOf("item:troll")
+=> void
+```
+
+## Bear and Chain
+
+Feed the bear to make it friendly, then unlock the chain:
+
+```
+const bg = colossalCave();
+bg.runner.store.setProperty("player:1", { name: "location", value: "room:in-barren-room" });
+bg.runner.store.setProperty("item:food", { name: "location", value: "player:1" });
+bg.runner.store.setProperty("item:keys", { name: "location", value: "player:1" });
+bg.do("give food to bear");
+bg.prop("item:bear", "friendly")
+=> true
+```
+
+``` continue
+bg.do("unlock chain");
+bg.prop("item:chain", "locked")
+=> false
+```
+
+## Lantern Battery
+
+The lantern drains power each turn:
+
+```
+const lg = colossalCave();
+lg.runner.store.setProperty("player:1", { name: "location", value: "room:inside-building" });
+lg.runner.store.setProperty("item:lantern", { name: "location", value: "player:1" });
+lg.do("turn lamp");
+const before = lg.prop("item:lantern", "powerRemaining");
+lg.do("east");
+const after = lg.prop("item:lantern", "powerRemaining");
+(after as number) < (before as number)
+=> true
+```
+
+## Crystal Bridge
+
+Wave the rod at the fissure to create a bridge:
+
+```
+const fg = colossalCave();
+fg.runner.store.setProperty("player:1", { name: "location", value: "room:on-east-bank-of-fissure" });
+fg.runner.store.setProperty("item:rod", { name: "location", value: "player:1" });
+fg.do("wave rod")
+=> A crystal bridge now spans the fissure.
+```
+
+``` continue
+fg.do("west");
+fg.room
+=> room:west-side-of-fissure
+```
+
 ## Score
 
 The player starts with 36 points:
