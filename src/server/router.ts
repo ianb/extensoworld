@@ -1,9 +1,18 @@
 import { z } from "zod";
 import { router, publicProcedure } from "./trpc.js";
-import { createSampleWorld, processCommand } from "../core/index.js";
-import type { EntityStore } from "../core/index.js";
+import { createSampleWorld, processCommand, describeRoomFull } from "../core/index.js";
+import type { EntityStore, VerbRegistry } from "../core/index.js";
 
-let store: EntityStore = createSampleWorld();
+let store: EntityStore;
+let verbs: VerbRegistry;
+
+function resetWorld(): void {
+  const world = createSampleWorld();
+  store = world.store;
+  verbs = world.verbs;
+}
+
+resetWorld();
 
 function describeCurrentRoom(s: EntityStore): string {
   const players = s.findByTag("player");
@@ -11,12 +20,7 @@ function describeCurrentRoom(s: EntityStore): string {
   if (!player) return "No player found.";
   const roomId = player.properties["location"] as string;
   const room = s.get(roomId);
-  const name = (room.properties["name"] as string) || room.id;
-  const description = (room.properties["description"] as string) || "";
-  const exits = s.getExits(room.id);
-  const exitDirs = exits.map((e) => e.properties["direction"] as string);
-  const exitList = exitDirs.length > 0 ? exitDirs.join(", ") : "none";
-  return `${name}\n\n${description}\n\nExits: ${exitList}`;
+  return describeRoomFull(s, { room, playerId: player.id });
 }
 
 export const appRouter = router({
@@ -25,12 +29,12 @@ export const appRouter = router({
   }),
 
   command: publicProcedure.input(z.object({ text: z.string() })).mutation(({ input }) => {
-    const result = processCommand(store, input.text);
+    const result = processCommand(store, { input: input.text, verbs });
     return { output: result.output };
   }),
 
   reset: publicProcedure.mutation(() => {
-    store = createSampleWorld();
+    resetWorld();
     return { output: describeCurrentRoom(store) };
   }),
 });

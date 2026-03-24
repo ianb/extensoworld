@@ -1,4 +1,7 @@
 import type { EntityStore, Entity } from "./entity.js";
+import type { VerbContext, VerbRegistry } from "./verbs.js";
+import { parseCommand, resolveCommand } from "./verbs.js";
+import { describeRoomFull } from "./describe.js";
 
 export interface CommandResult {
   output: string;
@@ -17,6 +20,13 @@ const DIRECTION_ALIASES: Record<string, string> = {
   d: "down",
 };
 
+class PlayerNotFoundError extends Error {
+  constructor() {
+    super("No player entity found");
+    this.name = "PlayerNotFoundError";
+  }
+}
+
 function getPlayer(store: EntityStore): Entity {
   const players = store.findByTag("player");
   const player = players[0];
@@ -32,78 +42,79 @@ function getPlayerRoom(store: EntityStore): Entity {
   return store.get(roomId);
 }
 
-function describeRoom(store: EntityStore, room: Entity): string {
-  const name = (room.properties["name"] as string) || room.id;
-  const description = (room.properties["description"] as string) || "";
-  const exits = store.getExits(room.id);
-  const exitDirs = exits.map((e) => e.properties["direction"] as string);
-  const exitList = exitDirs.length > 0 ? exitDirs.join(", ") : "none";
-  return `${name}\n\n${description}\n\nExits: ${exitList}`;
-}
-
-function resolveDirection(input: string): { direction: string; isExplicitGo: boolean } {
-  if (input.startsWith("go ")) {
-    const raw = input.slice(3).trim();
-    const expanded = DIRECTION_ALIASES[raw] || raw;
-    return { direction: expanded, isExplicitGo: true };
-  }
-  const expanded = DIRECTION_ALIASES[input] || input;
-  return { direction: expanded, isExplicitGo: false };
-}
-
-function findExit(
-  store: EntityStore,
-  { roomId, direction }: { roomId: string; direction: string },
-): Entity | null {
-  const exits = store.getExits(roomId);
-  for (const exit of exits) {
-    if (exit.properties["direction"] === direction) {
-      return exit;
-    }
-  }
-  return null;
-}
-
-export function processCommand(store: EntityStore, input: string): CommandResult {
+function tryMovement(store: EntityStore, input: string): CommandResult | null {
   const trimmed = input.trim().toLowerCase();
+  let direction: string;
+  let isExplicitGo = false;
+
+  if (trimmed.startsWith("go ")) {
+    const raw = trimmed.slice(3).trim();
+    direction = DIRECTION_ALIASES[raw] || raw;
+    isExplicitGo = true;
+  } else {
+    const expanded = DIRECTION_ALIASES[trimmed];
+    if (!expanded) return null;
+    direction = expanded;
+  }
+
   const room = getPlayerRoom(store);
-
-  if (trimmed === "look" || trimmed === "l") {
-    return { output: describeRoom(store, room) };
-  }
-
-  if (trimmed === "help") {
-    return { output: "Commands: look (l), go <direction> (or just n/s/e/w), help" };
-  }
-
-  // Try movement
-  const { direction, isExplicitGo } = resolveDirection(trimmed);
-  const exit = findExit(store, { roomId: room.id, direction });
+  const exits = store.getExits(room.id);
+  const exit = exits.find((e) => e.properties["direction"] === direction);
 
   if (exit) {
     const destination = exit.properties["destination"] as string;
     const player = getPlayer(store);
     store.setProperty(player.id, { name: "location", value: destination });
     const newRoom = store.get(destination);
-    return { output: describeRoom(store, newRoom) };
+    const output = describeRoomFull(store, { room: newRoom, playerId: player.id });
+    return { output };
   }
 
   if (isExplicitGo) {
-    const exits = store.getExits(room.id);
     const exitDirs = exits.map((e) => e.properties["direction"] as string);
-    return {
-      output: `You can't go ${direction}. Available exits: ${exitDirs.join(", ")}`,
-    };
+    return { output: `You can't go ${direction}. Available exits: ${exitDirs.join(", ")}` };
   }
 
-  return {
-    output: `Unknown command: ${trimmed}. Type "help" for available commands.`,
-  };
+  return null;
 }
 
-class PlayerNotFoundError extends Error {
-  constructor() {
-    super("No player entity found");
-    this.name = "PlayerNotFoundError";
+export function processCommand(
+  store: EntityStore,
+  { input, verbs }: { input: string; verbs: VerbRegistry },
+): CommandResult {
+  // Try movement first (direction aliases + "go X")
+  const movement = tryMovement(store, input);
+  if (movement) return movement;
+
+  // Parse and resolve through the verb system
+  const parsed = parseCommand(input);
+  if (!parsed) {
+    return { output: `I don't understand "${input}". Type "help" for commands.` };
   }
+
+  const player = getPlayer(store);
+  const room = getPlayerRoom(store);
+
+  const resolved = resolveCommand(parsed, {
+    store,
+    roomId: room.id,
+    playerId: player.id,
+  });
+
+  // Resolution failed (object not found, ambiguous, etc.)
+  if (typeof resolved === "string") {
+    return { output: resolved };
+  }
+
+  const context: VerbContext = { store, command: resolved, player, room };
+  const result = verbs.dispatch(context);
+
+  if (result.outcome === "performed") {
+    return { output: result.output };
+  }
+  if (result.outcome === "vetoed") {
+    return { output: result.output };
+  }
+
+  return { output: `I don't know how to "${input}". Type "help" for commands.` };
 }

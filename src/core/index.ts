@@ -16,3 +16,9 @@ export type { PropertyDefinition, PropertyRegistry, PropertyBag } from "./proper
 
 export { EntityStore, VOID_LOCATION, WORLD_LOCATION } from "./entity.js";
 export type { Entity } from "./entity.js";
+
+export { VerbRegistry, parseCommand, resolveCommand } from "./verbs.js";
+export type { VerbHandler, VerbContext, VerbPattern } from "./verbs.js";
+
+export { createDefaultVerbs } from "./default-verbs.js";
+export { describeRoomFull } from "./describe.js";
