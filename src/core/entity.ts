@@ -1,0 +1,247 @@
+import type { PropertyRegistry, PropertyBag } from "./properties.js";
+import { validateValue } from "./properties.js";
+
+export interface Entity {
+  id: string;
+  tags: Set<string>;
+  properties: PropertyBag;
+}
+
+export const VOID_LOCATION = "void";
+export const WORLD_LOCATION = "world";
+
+class EntityNotFoundError extends Error {
+  constructor(public readonly entityId: string) {
+    super(`Entity not found: ${entityId}`);
+    this.name = "EntityNotFoundError";
+  }
+}
+
+class DuplicateEntityError extends Error {
+  constructor(public readonly entityId: string) {
+    super(`Entity already exists: ${entityId}`);
+    this.name = "DuplicateEntityError";
+  }
+}
+
+class PropertyValueError extends Error {
+  constructor(
+    public readonly propertyName: string,
+    public readonly errors: string[],
+  ) {
+    super(`Invalid value for property "${propertyName}"`);
+    this.name = "PropertyValueError";
+  }
+}
+
+interface CreateEntityOptions {
+  tags?: string[];
+  properties?: PropertyBag;
+}
+
+export class EntityStore {
+  private entities: Map<string, Entity> = new Map();
+  private locationIndex: Map<string, Set<string>> = new Map();
+  private nextId = 1;
+  readonly registry: PropertyRegistry;
+
+  constructor(registry: PropertyRegistry) {
+    this.registry = registry;
+  }
+
+  generateId(prefix: string): string {
+    const id = `${prefix}-${this.nextId}`;
+    this.nextId += 1;
+    return id;
+  }
+
+  create(id: string, options: CreateEntityOptions): Entity {
+    if (this.entities.has(id)) {
+      throw new DuplicateEntityError(id);
+    }
+    const entity: Entity = {
+      id,
+      tags: new Set(options.tags || []),
+      properties: { ...options.properties },
+    };
+    this.entities.set(id, entity);
+
+    const location = (entity.properties["location"] as string) || VOID_LOCATION;
+    this.addToLocationIndex(location, id);
+
+    return entity;
+  }
+
+  get(id: string): Entity {
+    const entity = this.entities.get(id);
+    if (!entity) {
+      throw new EntityNotFoundError(id);
+    }
+    return entity;
+  }
+
+  tryGet(id: string): Entity | null {
+    return this.entities.get(id) || null;
+  }
+
+  has(id: string): boolean {
+    return this.entities.has(id);
+  }
+
+  setProperty(id: string, assignment: { name: string; value: unknown }): void {
+    const entity = this.get(id);
+    const { name, value } = assignment;
+
+    // Validate if the property is defined in the registry
+    const def = this.registry.definitions[name];
+    if (def) {
+      const errors = validateValue(this.registry, { name, value });
+      if (errors.length > 0) {
+        throw new PropertyValueError(name, errors);
+      }
+    }
+
+    const oldValue = entity.properties[name];
+    entity.properties[name] = value;
+
+    if (name === "location") {
+      const oldLocation = (oldValue as string) || VOID_LOCATION;
+      const newLocation = (value as string) || VOID_LOCATION;
+      this.removeFromLocationIndex(oldLocation, id);
+      this.addToLocationIndex(newLocation, id);
+    }
+  }
+
+  removeProperty(id: string, name: string): void {
+    const entity = this.get(id);
+    const oldValue = entity.properties[name];
+    delete entity.properties[name];
+
+    if (name === "location") {
+      const oldLocation = (oldValue as string) || VOID_LOCATION;
+      this.removeFromLocationIndex(oldLocation, id);
+      this.addToLocationIndex(VOID_LOCATION, id);
+    }
+  }
+
+  getProperty<T>(id: string, name: string): T | undefined {
+    return this.get(id).properties[name] as T | undefined;
+  }
+
+  addTag(id: string, tag: string): void {
+    this.get(id).tags.add(tag);
+  }
+
+  removeTag(id: string, tag: string): void {
+    this.get(id).tags.delete(tag);
+  }
+
+  hasTag(id: string, tag: string): boolean {
+    return this.get(id).tags.has(tag);
+  }
+
+  /** Get direct children at a location */
+  getContents(locationId: string): Entity[] {
+    const ids = this.locationIndex.get(locationId);
+    if (!ids) return [];
+    const result: Entity[] = [];
+    for (const id of ids) {
+      const entity = this.entities.get(id);
+      if (entity) result.push(entity);
+    }
+    return result;
+  }
+
+  /** Get all entities transitively contained within a location */
+  getContentsDeep(locationId: string): Entity[] {
+    const result: Entity[] = [];
+    const queue = [locationId];
+    const visited = new Set<string>();
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      const children = this.getContents(current);
+      for (const child of children) {
+        result.push(child);
+        queue.push(child.id);
+      }
+    }
+    return result;
+  }
+
+  /** Walk up the location chain to find the containing entity with a given tag */
+  findContaining(entityId: string, tag: string): Entity | null {
+    let currentId = entityId;
+    const visited = new Set<string>();
+    while (currentId) {
+      if (visited.has(currentId)) return null;
+      visited.add(currentId);
+      const entity = this.tryGet(currentId);
+      if (!entity) return null;
+      if (entity.tags.has(tag) && entity.id !== entityId) return entity;
+      const location = entity.properties["location"] as string | undefined;
+      if (!location || location === VOID_LOCATION || location === WORLD_LOCATION) return null;
+      currentId = location;
+    }
+    return null;
+  }
+
+  /** Walk up the location chain to get the full path from entity to root */
+  getLocationChain(entityId: string): Entity[] {
+    const chain: Entity[] = [];
+    let currentId = entityId;
+    const visited = new Set<string>();
+    while (currentId) {
+      if (visited.has(currentId)) break;
+      visited.add(currentId);
+      const entity = this.tryGet(currentId);
+      if (!entity) break;
+      chain.push(entity);
+      const location = entity.properties["location"] as string | undefined;
+      if (!location || location === VOID_LOCATION || location === WORLD_LOCATION) break;
+      currentId = location;
+    }
+    return chain;
+  }
+
+  /** Find all entities with a given tag */
+  findByTag(tag: string): Entity[] {
+    const result: Entity[] = [];
+    for (const entity of this.entities.values()) {
+      if (entity.tags.has(tag)) {
+        result.push(entity);
+      }
+    }
+    return result;
+  }
+
+  /** Find entities at a location with a specific tag */
+  findByTagAt(tag: string, locationId: string): Entity[] {
+    return this.getContents(locationId).filter((e) => e.tags.has(tag));
+  }
+
+  /** Get exits from a room (exit entities whose location is this room) */
+  getExits(roomId: string): Entity[] {
+    return this.findByTagAt("exit", roomId);
+  }
+
+  private addToLocationIndex(locationId: string, entityId: string): void {
+    let set = this.locationIndex.get(locationId);
+    if (!set) {
+      set = new Set();
+      this.locationIndex.set(locationId, set);
+    }
+    set.add(entityId);
+  }
+
+  private removeFromLocationIndex(locationId: string, entityId: string): void {
+    const set = this.locationIndex.get(locationId);
+    if (set) {
+      set.delete(entityId);
+      if (set.size === 0) {
+        this.locationIndex.delete(locationId);
+      }
+    }
+  }
+}
