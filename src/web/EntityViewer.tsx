@@ -5,6 +5,8 @@ interface EntityListItem {
   id: string;
   name: string;
   tags: string[];
+  location: string | null;
+  hasChanges: boolean;
 }
 
 interface EntitySnapshot {
@@ -30,11 +32,16 @@ export function EntityViewer({
   revision: number;
 }) {
   const [entities, setEntities] = useState<EntityListItem[]>([]);
+  const [playerRoomId, setPlayerRoomId] = useState<string | null>(null);
   const [details, setDetails] = useState<Map<string, EntityDetailInfo>>(new Map());
   const [showDiff, setShowDiff] = useState(false);
+  const [othersExpanded, setOthersExpanded] = useState(false);
 
   useEffect(() => {
-    trpc.entities.query({ gameId }).then(setEntities);
+    trpc.entities.query({ gameId }).then((result) => {
+      setEntities(result.items);
+      setPlayerRoomId(result.playerRoomId);
+    });
   }, [revision, gameId]);
 
   // Re-fetch detail for the selected entity when it changes or the world updates
@@ -56,11 +63,26 @@ export function EntityViewer({
   }
 
   function refreshEntities(): void {
-    trpc.entities.query({ gameId }).then(setEntities);
+    trpc.entities.query({ gameId }).then((result) => {
+      setEntities(result.items);
+      setPlayerRoomId(result.playerRoomId);
+    });
     setDetails(new Map());
   }
 
-  const grouped = groupByTag(entities);
+  // Split entities: current room + its contents vs everything else
+  const roomEntities: EntityListItem[] = [];
+  const otherEntities: EntityListItem[] = [];
+  for (const e of entities) {
+    if (e.id === playerRoomId || e.location === playerRoomId) {
+      roomEntities.push(e);
+    } else {
+      otherEntities.push(e);
+    }
+  }
+
+  const roomGrouped = groupByTag(roomEntities);
+  const otherGrouped = groupByTag(otherEntities);
 
   return (
     <div className="flex h-full flex-col text-xs">
@@ -87,25 +109,77 @@ export function EntityViewer({
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {Object.entries(grouped).map(([tag, items]) => (
-          <div key={tag}>
-            <div className="px-3 py-1 text-[10px] font-bold tracking-wide text-gray-500 uppercase">
-              {tag}
-            </div>
-            {items.map((e) => (
-              <EntityRow
-                key={e.id}
-                entity={e}
-                selected={e.id === selectedId}
-                detail={details.get(e.id) || null}
-                showDiff={showDiff}
-                onToggle={() => handleSelect(e.id)}
-              />
-            ))}
+        {/* Current room section */}
+        <div className="border-b border-gray-700">
+          <div className="px-3 py-1.5 text-[10px] font-bold tracking-wide text-sky-400 uppercase">
+            Current Room
           </div>
-        ))}
+          <EntityGroup
+            grouped={roomGrouped}
+            selectedId={selectedId}
+            details={details}
+            showDiff={showDiff}
+            onToggle={handleSelect}
+          />
+        </div>
+
+        {/* Other entities section (collapsed by default) */}
+        <div>
+          <button
+            onClick={() => setOthersExpanded(!othersExpanded)}
+            className="flex w-full items-center gap-1 px-3 py-1.5 text-left text-[10px] font-bold tracking-wide text-gray-500 uppercase hover:text-gray-400"
+          >
+            <span>{othersExpanded ? "▾" : "▸"}</span>
+            All Other Entities ({otherEntities.length})
+          </button>
+          {othersExpanded ? (
+            <EntityGroup
+              grouped={otherGrouped}
+              selectedId={selectedId}
+              details={details}
+              showDiff={showDiff}
+              onToggle={handleSelect}
+            />
+          ) : null}
+        </div>
       </div>
     </div>
+  );
+}
+
+function EntityGroup({
+  grouped,
+  selectedId,
+  details,
+  showDiff,
+  onToggle,
+}: {
+  grouped: Record<string, EntityListItem[]>;
+  selectedId: string | null;
+  details: Map<string, EntityDetailInfo>;
+  showDiff: boolean;
+  onToggle: (id: string) => void;
+}) {
+  return (
+    <>
+      {Object.entries(grouped).map(([tag, items]) => (
+        <div key={tag}>
+          <div className="px-3 py-1 text-[10px] font-bold tracking-wide text-gray-500 uppercase">
+            {tag}
+          </div>
+          {items.map((e) => (
+            <EntityRow
+              key={e.id}
+              entity={e}
+              selected={e.id === selectedId}
+              detail={details.get(e.id) || null}
+              showDiff={showDiff}
+              onToggle={() => onToggle(e.id)}
+            />
+          ))}
+        </div>
+      ))}
+    </>
   );
 }
 
@@ -122,6 +196,7 @@ function EntityRow({
   showDiff: boolean;
   onToggle: () => void;
 }) {
+  const changedIndicator = showDiff && entity.hasChanges;
   return (
     <div className="border-b border-gray-800/50">
       <button
@@ -131,6 +206,7 @@ function EntityRow({
         }`}
       >
         <span className="text-gray-600">{selected ? "▾" : "▸"}</span>
+        {changedIndicator ? <span className="text-yellow-500">●</span> : null}
         {entity.name !== entity.id && <span>{entity.name} </span>}
         <span className="font-mono text-gray-600">{entity.id}</span>
       </button>
@@ -231,5 +307,12 @@ function groupByTag(entities: EntityListItem[]): Record<string, EntityListItem[]
     if (!groups[tag]) groups[tag] = [];
     groups[tag].push(e);
   }
-  return groups;
+  // Sort exits to the end
+  const sorted: Record<string, EntityListItem[]> = {};
+  const exitGroup = groups["exit"];
+  for (const [tag, items] of Object.entries(groups)) {
+    if (tag !== "exit") sorted[tag] = items;
+  }
+  if (exitGroup) sorted["exit"] = exitGroup;
+  return sorted;
 }

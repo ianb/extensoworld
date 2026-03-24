@@ -76,10 +76,22 @@ export const appRouter = router({
   entities: publicProcedure.input(gameInput).query(({ input }) => {
     const game = getOrCreateGame(input.gameId);
     const ids = game.store.getAllIds();
-    return ids.map((id) => {
+    const players = game.store.findByTag("player");
+    const playerRoomId = players[0] ? (players[0].properties["location"] as string) || null : null;
+    const items = ids.map((id) => {
       const snap = game.store.getSnapshot(id);
-      return { id: snap.id, name: (snap.properties["name"] as string) || snap.id, tags: snap.tags };
+      const initial = game.store.getInitialState(id);
+      const hasChanges =
+        initial !== null && JSON.stringify(snap.properties) !== JSON.stringify(initial.properties);
+      return {
+        id: snap.id,
+        name: (snap.properties["name"] as string) || snap.id,
+        tags: snap.tags,
+        location: (snap.properties["location"] as string) || null,
+        hasChanges,
+      };
     });
+    return { items, playerRoomId };
   }),
 
   entity: publicProcedure
