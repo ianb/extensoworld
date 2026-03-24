@@ -7,6 +7,7 @@ import {
 import { createAllRooms } from "./rooms.js";
 import { createItems } from "./items.js";
 import { createDoors } from "./doors.js";
+import { xyzzy, plugh, plover, fee, fie, foe, foo, oldMagic } from "./magic-words.js";
 import { registerGame } from "../registry.js";
 
 registerGame({
@@ -19,6 +20,9 @@ registerGame({
     defineBaseProperties(registry);
     const store = new EntityStore(registry);
     const verbs = createDefaultVerbs();
+    for (const handler of [xyzzy, plugh, plover, fee, fie, foe, foo, oldMagic]) {
+      verbs.register(handler);
+    }
 
     createAllRooms(store);
     createItems(store);

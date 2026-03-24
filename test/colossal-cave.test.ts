@@ -115,6 +115,46 @@ test("score command works", (t) => {
   t.end();
 });
 
+test("xyzzy teleports between building and debris room", (t) => {
+  const game = newGame();
+  game.command("west"); // inside building
+  game.command("xyzzy");
+  t.equal(game.currentRoom(), "room:in-debris-room");
+  game.command("xyzzy");
+  t.equal(game.currentRoom(), "room:inside-building");
+  t.end();
+});
+
+test("plugh teleports between building and Y2", (t) => {
+  const game = newGame();
+  game.command("west"); // inside building
+  game.command("plugh");
+  t.equal(game.currentRoom(), "room:at-y2");
+  game.command("plugh");
+  t.equal(game.currentRoom(), "room:inside-building");
+  t.end();
+});
+
+test("xyzzy does nothing in wrong location", (t) => {
+  const game = newGame();
+  const output = game.command("xyzzy");
+  t.match(output, /nothing happens/i);
+  t.equal(game.currentRoom(), "room:at-end-of-road");
+  t.end();
+});
+
+test("fee fie foe foo returns eggs to giant room", (t) => {
+  const game = newGame();
+  // Move eggs out of giant room first
+  game.store.setProperty("item:eggs", { name: "location", value: "player:1" });
+  game.command("fee");
+  game.command("fie");
+  game.command("foe");
+  game.command("foo");
+  t.equal(game.getProperty("item:eggs", "location"), "room:in-giant-room");
+  t.end();
+});
+
 test("room count is substantial", (t) => {
   const game = newGame();
   const allIds = game.store.getAllIds();
