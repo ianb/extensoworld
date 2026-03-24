@@ -7,6 +7,7 @@ import { getGame, listGames } from "../games/registry.js";
 
 // Import game registrations
 import "../games/test-world.js";
+import "../games/colossal-cave/index.js";
 
 const activeGames: Map<string, GameInstance> = new Map();
 
