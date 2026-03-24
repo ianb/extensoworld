@@ -4,6 +4,7 @@ export interface ItemOptions {
   id: string;
   name: string;
   description: string;
+  shortDescription?: string;
   location: string;
   tags?: string[];
   aliases?: string[];
@@ -24,6 +25,9 @@ export function item(store: EntityStore, options: ItemOptions): void {
     name: options.name,
     description: options.description,
   };
+  if (options.shortDescription) {
+    properties.shortDescription = options.shortDescription;
+  }
   if (options.aliases) {
     properties.aliases = options.aliases;
   }

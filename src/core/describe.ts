@@ -10,6 +10,19 @@ export function entityRef(entity: Entity): string {
   return `{{${entity.id}|${entityName(entity)}}}`;
 }
 
+/**
+ * Display string for an item in listings (inventory, room "You see:").
+ * Uses shortDescription template if set, otherwise falls back to entityRef.
+ */
+export function itemDisplay(entity: Entity, store: EntityStore): string {
+  const short = entity.properties["shortDescription"] as string | undefined;
+  if (short) {
+    const rendered = renderTemplate(short, { entity, store });
+    return `{{${entity.id}|${rendered}}}`;
+  }
+  return entityRef(entity);
+}
+
 export function describeRoomFull(
   store: EntityStore,
   { room, playerId }: { room: Entity; playerId: string },
@@ -28,11 +41,11 @@ export function describeRoomFull(
 
   if (items.length > 0) {
     const itemDescs = items.map((e) => {
-      const ref = entityRef(e);
+      const display = itemDisplay(e, store);
       if (e.tags.has("container") && e.tags.has("openable")) {
-        return e.properties["open"] === true ? `${ref} (open)` : `${ref} (closed)`;
+        return e.properties["open"] === true ? `${display} (open)` : `${display} (closed)`;
       }
-      return ref;
+      return display;
     });
     parts.push(`\nYou see: ${itemDescs.join(", ")}.`);
   }

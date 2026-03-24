@@ -23,7 +23,7 @@ export type { VerbHandler, VerbContext, VerbPattern } from "./verbs.js";
 export { SYSTEM_VERBS } from "./verb-types.js";
 
 export { createDefaultVerbs } from "./default-verbs.js";
-export { describeRoomFull, entityRef } from "./describe.js";
+export { describeRoomFull, entityRef, itemDisplay } from "./describe.js";
 export { defineBaseProperties } from "./base-properties.js";
 export { SeededRandom } from "./random.js";
 export { createGameRunner } from "./game-runner.js";

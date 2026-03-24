@@ -27,6 +27,7 @@ function createBuildingItems(store: EntityStore): void {
     name: "Brass lantern",
     description:
       "${self.switchedOn ? 'Your lamp is here, gleaming brightly.' : 'There is a shiny brass lamp nearby.'}",
+    shortDescription: "${self.switchedOn ? 'Brass lantern (lit)' : 'Brass lantern'}",
     location: "room:inside-building",
     portable: true,
     tags: ["device"],
@@ -60,7 +61,10 @@ function createCaveItems(store: EntityStore): void {
   item(store, {
     id: "item:cage",
     name: "Wicker cage",
-    description: "There is a small wicker cage discarded nearby.",
+    description:
+      "${self.location === 'player' ? 'A small wicker cage.' : 'There is a small wicker cage discarded nearby.'}",
+    shortDescription:
+      "${contents().length > 0 ? 'Wicker cage (with ' + contents().join(', ') + ')' : 'Wicker cage'}",
     location: "room:in-cobble-crawl",
     portable: true,
     tags: ["container", "openable"],

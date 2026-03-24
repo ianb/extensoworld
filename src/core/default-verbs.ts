@@ -2,7 +2,7 @@ import type { Entity } from "./entity.js";
 import type { VerbHandler, VerbContext, PerformResult, WorldEvent } from "./verbs.js";
 import { VerbRegistry } from "./verbs.js";
 import { SYSTEM_VERBS } from "./verb-types.js";
-import { describeRoomFull, entityRef } from "./describe.js";
+import { describeRoomFull, entityRef, itemDisplay } from "./describe.js";
 import { open, close, putIn, takeFrom, unlock, unlockWith, lock } from "./container-verbs.js";
 import { switchOn, switchOff, turnOnPrep, turnOffPrep } from "./device-verbs.js";
 import { isRoomLit, darknessDescription } from "./darkness.js";
@@ -87,7 +87,7 @@ const examine: VerbHandler = {
 const take: VerbHandler = {
   name: "take",
   source: "default-verbs.ts",
-  pattern: { verb: "take", verbAliases: ["get"], form: "transitive" },
+  pattern: { verb: "take", verbAliases: ["get", "g"], form: "transitive" },
   priority: 0,
   objectRequirements: { tags: ["portable"] },
   check(context: VerbContext) {
@@ -155,7 +155,8 @@ const inventory: VerbHandler = {
   perform(context: VerbContext): PerformResult {
     const carried = context.store.getContents(context.player.id);
     if (carried.length === 0) return { output: "You aren't carrying anything.", events: [] };
-    return { output: `You are carrying: ${itemRefs(carried)}.`, events: [] };
+    const displays = carried.map((e) => itemDisplay(e, context.store));
+    return { output: `You are carrying: ${displays.join(", ")}.`, events: [] };
   },
 };
 

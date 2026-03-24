@@ -11,6 +11,11 @@ export function defineBaseProperties(registry: PropertyRegistry): void {
       schema: { type: "string" },
     },
     {
+      name: "shortDescription",
+      description: "Template string used in listings (inventory, room items). Falls back to name.",
+      schema: { type: "string" },
+    },
+    {
       name: "location",
       description: "ID of the containing entity",
       schema: { type: "string", format: "entity-ref" },
