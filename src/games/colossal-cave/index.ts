@@ -18,6 +18,7 @@ import {
   lanternDrain,
   waveRod,
 } from "./puzzles-more.js";
+import { dwarfSpawn, dwarfEncounter, dwarfFollow, throwAxeAtDwarf } from "./dwarves.js";
 import { registerGame } from "../registry.js";
 
 registerGame({
@@ -45,6 +46,10 @@ registerGame({
       bearFollows,
       lanternDrain,
       waveRod,
+      dwarfSpawn,
+      dwarfEncounter,
+      dwarfFollow,
+      throwAxeAtDwarf,
     ];
     for (const handler of [xyzzy, plugh, plover, fee, fie, foe, foo, oldMagic, ...allHandlers]) {
       verbs.register(handler);

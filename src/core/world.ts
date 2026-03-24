@@ -152,6 +152,29 @@ function dispatchSystemVerbs(
   return allOutputs;
 }
 
+/** Fire [encounter] for each entity in the current room */
+function dispatchEncounters(
+  verbs: VerbRegistry,
+  { store, player }: { store: EntityStore; player: Entity },
+): string[] {
+  const room = getPlayerRoom(store);
+  const contents = store.getContents(room.id);
+  const allOutputs: string[] = [];
+  for (const entity of contents) {
+    if (entity.id === player.id) continue;
+    if (entity.tags.has("exit")) continue;
+    const context: VerbContext = {
+      store,
+      command: { form: "transitive", verb: SYSTEM_VERBS.ENCOUNTER, object: entity },
+      player,
+      room,
+    };
+    const outputs = verbs.dispatchSystem(SYSTEM_VERBS.ENCOUNTER, context);
+    allOutputs.push(...outputs);
+  }
+  return allOutputs;
+}
+
 export function processCommand(
   store: EntityStore,
   { input, verbs, debug }: { input: string; verbs: VerbRegistry; debug?: boolean },
@@ -169,6 +192,8 @@ export function processCommand(
         systemVerbs: [SYSTEM_VERBS.ENTER, SYSTEM_VERBS.TICK],
       });
       parts.push(...systemOutput);
+      const encounterOutput = dispatchEncounters(verbs, { store, player });
+      parts.push(...encounterOutput);
     }
     return {
       output: parts.join("\n"),

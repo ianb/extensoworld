@@ -60,6 +60,8 @@ export const SYSTEM_VERBS = {
   ENTER: "[enter]",
   LEAVE: "[leave]",
   TICK: "[tick]",
+  /** Fired for each entity in the room when the player enters */
+  ENCOUNTER: "[encounter]",
 } as const;
 
 export interface VerbHandler {

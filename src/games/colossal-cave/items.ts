@@ -189,6 +189,42 @@ function createNPCs(store: EntityStore): void {
   });
 
   item(store, {
+    id: "item:axe",
+    name: "Dwarvish axe",
+    description: "There is a little axe here.",
+    location: "void",
+    portable: true,
+    aliases: ["axe", "little", "dwarven"],
+  });
+
+  // Dwarf is a singleton representing the current active dwarf
+  store.create("npc:dwarf", {
+    tags: ["npc", "dwarf"],
+    properties: {
+      location: "void",
+      name: "Dwarf",
+      description: "A threatening little dwarf hides in the shadows.",
+      aliases: ["dwarf", "nasty", "mean", "threatening"],
+      fixed: true,
+      remaining: 5,
+      hasAxe: true,
+    },
+  });
+
+  // Pirate
+  store.create("npc:pirate", {
+    tags: ["npc"],
+    properties: {
+      location: "void",
+      name: "Pirate",
+      fixed: true,
+      spotted: false,
+      rich: false,
+      retired: false,
+    },
+  });
+
+  item(store, {
     id: "item:troll",
     name: "Troll",
     description:
