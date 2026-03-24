@@ -1,4 +1,5 @@
 import { EntityStore, WORLD_LOCATION } from "./entity.js";
+import type { PropertyRegistry } from "./properties.js";
 import { createRegistry, defineProperty } from "./properties.js";
 import { createDefaultVerbs } from "./default-verbs.js";
 import type { VerbRegistry } from "./verbs.js";
@@ -8,57 +9,54 @@ interface SampleWorld {
   verbs: VerbRegistry;
 }
 
-export function createSampleWorld(): SampleWorld {
-  const registry = createRegistry();
+function defineBaseProperties(registry: PropertyRegistry): void {
+  const props = [
+    { name: "name", description: "Display name", schema: { type: "string" } },
+    {
+      name: "description",
+      description: "Text description shown to the player",
+      schema: { type: "string" },
+    },
+    { name: "location", description: "ID of the containing entity", schema: { type: "string" } },
+    { name: "direction", description: "Direction label for an exit", schema: { type: "string" } },
+    { name: "destination", description: "Target room ID for an exit", schema: { type: "string" } },
+    {
+      name: "open",
+      description: "Whether a container or door is open",
+      schema: { type: "boolean" },
+      defaultValue: false,
+    },
+    {
+      name: "locked",
+      description: "Whether something is locked",
+      schema: { type: "boolean" },
+      defaultValue: false,
+    },
+    {
+      name: "unlockedBy",
+      description: "Entity ID of the key that unlocks this",
+      schema: { type: "string" },
+    },
+    {
+      name: "visits",
+      description: "Number of times the player has entered this room",
+      schema: { type: "number" },
+      defaultValue: 0,
+    },
+    {
+      name: "aliases",
+      description: "Alternative names for matching in commands",
+      schema: { type: "array", items: { type: "string" } },
+    },
+  ] as const;
 
-  defineProperty(registry, {
-    name: "name",
-    description: "Display name",
-    schema: { type: "string" },
-  });
+  for (const prop of props) {
+    defineProperty(registry, prop);
+  }
+}
 
-  defineProperty(registry, {
-    name: "description",
-    description: "Text description shown to the player",
-    schema: { type: "string" },
-  });
-
-  defineProperty(registry, {
-    name: "location",
-    description: "ID of the containing entity",
-    schema: { type: "string" },
-  });
-
-  defineProperty(registry, {
-    name: "direction",
-    description: "Direction label for an exit",
-    schema: { type: "string" },
-  });
-
-  defineProperty(registry, {
-    name: "destination",
-    description: "Target room ID for an exit",
-    schema: { type: "string" },
-  });
-
-  defineProperty(registry, {
-    name: "open",
-    description: "Whether a container or door is open",
-    schema: { type: "boolean" },
-    defaultValue: false,
-  });
-
-  defineProperty(registry, {
-    name: "locked",
-    description: "Whether something is locked",
-    schema: { type: "boolean" },
-    defaultValue: false,
-  });
-
-  const store = new EntityStore(registry);
-
-  // Rooms
-  store.create("clearing", {
+function createRooms(store: EntityStore): void {
+  store.create("room:clearing", {
     tags: ["room"],
     properties: {
       location: WORLD_LOCATION,
@@ -68,7 +66,7 @@ export function createSampleWorld(): SampleWorld {
     },
   });
 
-  store.create("deep-woods", {
+  store.create("room:deep-woods", {
     tags: ["room"],
     properties: {
       location: WORLD_LOCATION,
@@ -78,81 +76,120 @@ export function createSampleWorld(): SampleWorld {
     },
   });
 
-  store.create("hillside", {
+  store.create("room:hillside", {
     tags: ["room"],
     properties: {
       location: WORLD_LOCATION,
       name: "Rocky Hillside",
       description:
-        "Loose stones shift under your feet as you climb a gentle slope. From here you can see the forest stretching out to the west. A glint of metal catches your eye.",
+        "Loose stones shift under your feet as you climb a gentle slope. From here you can see the forest stretching out to the west. A small stone cabin stands at the top of the hill.",
     },
   });
 
-  // Exits
-  store.create("exit-clearing-north", {
-    tags: ["exit"],
-    properties: { location: "clearing", direction: "north", destination: "deep-woods" },
+  store.create("room:cabin", {
+    tags: ["room"],
+    properties: {
+      location: WORLD_LOCATION,
+      name: "Stone Cabin",
+      description:
+        "The interior of the cabin is sparse but cozy. A fireplace dominates one wall, and a rough wooden table sits in the center. Dusty shelves line the walls.",
+    },
   });
-  store.create("exit-clearing-east", {
-    tags: ["exit"],
-    properties: { location: "clearing", direction: "east", destination: "hillside" },
-  });
-  store.create("exit-deepwoods-south", {
-    tags: ["exit"],
-    properties: { location: "deep-woods", direction: "south", destination: "clearing" },
-  });
-  store.create("exit-hillside-west", {
-    tags: ["exit"],
-    properties: { location: "hillside", direction: "west", destination: "clearing" },
-  });
+}
 
-  // Items in the clearing
-  store.create("lantern", {
+function createExits(store: EntityStore): void {
+  store.create("exit:clearing:to-deep-woods", {
+    tags: ["exit"],
+    properties: { location: "room:clearing", direction: "north", destination: "room:deep-woods" },
+  });
+  store.create("exit:clearing:to-hillside", {
+    tags: ["exit"],
+    properties: { location: "room:clearing", direction: "east", destination: "room:hillside" },
+  });
+  store.create("exit:deep-woods:to-clearing", {
+    tags: ["exit"],
+    properties: { location: "room:deep-woods", direction: "south", destination: "room:clearing" },
+  });
+  store.create("exit:hillside:to-clearing", {
+    tags: ["exit"],
+    properties: { location: "room:hillside", direction: "west", destination: "room:clearing" },
+  });
+  store.create("exit:hillside:to-cabin", {
+    tags: ["exit", "openable"],
+    properties: {
+      location: "room:hillside",
+      direction: "enter",
+      destination: "room:cabin",
+      name: "Cabin Door",
+      aliases: ["door"],
+      locked: true,
+      unlockedBy: "item:key",
+    },
+  });
+  store.create("exit:cabin:to-hillside", {
+    tags: ["exit"],
+    properties: { location: "room:cabin", direction: "out", destination: "room:hillside" },
+  });
+}
+
+function createItems(store: EntityStore): void {
+  store.create("item:lantern", {
     tags: ["portable"],
     properties: {
-      location: "clearing",
+      location: "room:clearing",
       name: "Lantern",
+      aliases: ["lamp", "brass lantern"],
       description: "A brass lantern, slightly tarnished but still functional.",
     },
   });
 
-  // Chest in the deep woods (openable container)
-  store.create("chest", {
+  store.create("item:chest", {
     tags: ["container", "openable"],
     properties: {
-      location: "deep-woods",
+      location: "room:deep-woods",
       name: "Wooden Chest",
+      aliases: ["box"],
       description: "A sturdy wooden chest with iron bands. It looks old but well-made.",
       open: false,
+      locked: true,
+      unlockedBy: "item:key",
     },
   });
 
-  // Key inside the chest
-  store.create("key", {
+  store.create("item:key", {
     tags: ["portable"],
     properties: {
-      location: "chest",
+      location: "room:clearing",
       name: "Iron Key",
       description: "A heavy iron key with an ornate handle.",
     },
   });
 
-  // Coin on the hillside
-  store.create("coin", {
+  store.create("item:coin", {
     tags: ["portable"],
     properties: {
-      location: "hillside",
+      location: "room:hillside",
       name: "Silver Coin",
       description: "A tarnished silver coin with an unfamiliar crest.",
     },
   });
 
-  // Player
   store.create("player", {
     tags: ["player"],
-    properties: { location: "clearing", name: "You" },
+    properties: { location: "room:clearing", name: "You" },
   });
+}
 
+export function createSampleWorld(): SampleWorld {
+  const registry = createRegistry();
+  defineBaseProperties(registry);
+
+  const store = new EntityStore(registry);
+  createRooms(store);
+  createExits(store);
+  createItems(store);
+
+  store.snapshot();
   const verbs = createDefaultVerbs();
 
   return { store, verbs };

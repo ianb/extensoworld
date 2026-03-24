@@ -17,8 +17,27 @@ function findVisibleEntities(
   { roomId, playerId }: { roomId: string; playerId: string },
 ): Entity[] {
   const inRoom = store.getContentsDeep(roomId);
+  const seen = new Set(inRoom.map((e) => e.id));
+  // Add carried items that aren't already found via room (e.g., player is outside the room)
   const carried = store.getContentsDeep(playerId);
-  return [...inRoom, ...carried];
+  const result = [...inRoom];
+  for (const entity of carried) {
+    if (!seen.has(entity.id)) {
+      result.push(entity);
+    }
+  }
+  return result;
+}
+
+function getEntityNames(entity: Entity): string[] {
+  const names: string[] = [];
+  const primary = (entity.properties["name"] as string) || "";
+  if (primary) names.push(primary);
+  const aliases = entity.properties["aliases"] as string[] | undefined;
+  if (aliases) {
+    names.push(...aliases);
+  }
+  return names;
 }
 
 function matchEntityByName(
@@ -30,11 +49,22 @@ function matchEntityByName(
   const partial: Entity[] = [];
 
   for (const entity of candidates) {
-    const entityName = (entity.properties["name"] as string) || "";
-    const entityNameLower = entityName.toLowerCase();
-    if (entityNameLower === lower) {
+    const names = getEntityNames(entity);
+    let exactMatch = false;
+    let partialMatch = false;
+    for (const n of names) {
+      const nLower = n.toLowerCase();
+      if (nLower === lower) {
+        exactMatch = true;
+        break;
+      }
+      if (nLower.includes(lower)) {
+        partialMatch = true;
+      }
+    }
+    if (exactMatch) {
       exact.push(entity);
-    } else if (entityNameLower.includes(lower)) {
+    } else if (partialMatch) {
       partial.push(entity);
     }
   }

@@ -39,14 +39,54 @@ interface CreateEntityOptions {
   properties?: PropertyBag;
 }
 
+/** Serializable snapshot of an entity's state */
+export interface EntitySnapshot {
+  id: string;
+  tags: string[];
+  properties: PropertyBag;
+}
+
 export class EntityStore {
   private entities: Map<string, Entity> = new Map();
   private locationIndex: Map<string, Set<string>> = new Map();
   private nextId = 1;
+  private initialState: Map<string, EntitySnapshot> = new Map();
   readonly registry: PropertyRegistry;
 
   constructor(registry: PropertyRegistry) {
     this.registry = registry;
+  }
+
+  /** Save the current state of all entities as the baseline for diff tracking */
+  snapshot(): void {
+    this.initialState.clear();
+    for (const entity of this.entities.values()) {
+      this.initialState.set(entity.id, {
+        id: entity.id,
+        tags: Array.from(entity.tags),
+        properties: { ...entity.properties },
+      });
+    }
+  }
+
+  /** Get the initial snapshot of an entity, or null if it was created after snapshot */
+  getInitialState(id: string): EntitySnapshot | null {
+    return this.initialState.get(id) || null;
+  }
+
+  /** Get all entity IDs */
+  getAllIds(): string[] {
+    return Array.from(this.entities.keys());
+  }
+
+  /** Get a serializable snapshot of an entity's current state */
+  getSnapshot(id: string): EntitySnapshot {
+    const entity = this.get(id);
+    return {
+      id: entity.id,
+      tags: Array.from(entity.tags),
+      properties: { ...entity.properties },
+    };
   }
 
   generateId(prefix: string): string {

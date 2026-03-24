@@ -4,11 +4,16 @@ function entityName(entity: Entity): string {
   return (entity.properties["name"] as string) || entity.id;
 }
 
+/** Mark an entity name for highlighting in output: {{id|Name}} */
+export function entityRef(entity: Entity): string {
+  return `{{${entity.id}|${entityName(entity)}}}`;
+}
+
 export function describeRoomFull(
   store: EntityStore,
   { room, playerId }: { room: Entity; playerId: string },
 ): string {
-  const name = entityName(room);
+  const name = entityRef(room);
   const description = (room.properties["description"] as string) || "";
   const contents = store.getContents(room.id);
 
@@ -21,11 +26,11 @@ export function describeRoomFull(
 
   if (items.length > 0) {
     const itemDescs = items.map((e) => {
-      const n = entityName(e);
+      const ref = entityRef(e);
       if (e.tags.has("container") && e.tags.has("openable")) {
-        return e.properties["open"] === true ? `${n} (open)` : `${n} (closed)`;
+        return e.properties["open"] === true ? `${ref} (open)` : `${ref} (closed)`;
       }
-      return n;
+      return ref;
     });
     parts.push(`\nYou see: ${itemDescs.join(", ")}.`);
   }

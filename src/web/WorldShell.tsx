@@ -1,15 +1,23 @@
 import { useState, useRef, useEffect } from "react";
 import { trpc } from "./trpc.js";
+import { HighlightedText } from "./HighlightedText.js";
 
 interface LogEntry {
-  type: "input" | "output";
+  type: "input" | "output" | "debug";
   text: string;
 }
 
-export function WorldShell() {
+export function WorldShell({
+  onEntityClick,
+  onCommandComplete,
+}: {
+  onEntityClick?: (id: string) => void;
+  onCommandComplete?: () => void;
+}) {
   const [log, setLog] = useState<LogEntry[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
   const logEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -35,9 +43,18 @@ export function WorldShell() {
 
     setLog((prev) => [...prev, { type: "input", text: `> ${command}` }]);
 
-    const result = await trpc.command.mutate({ text: command });
-    setLog((prev) => [...prev, { type: "output", text: result.output }]);
+    const result = await trpc.command.mutate({ text: command, debug: debugMode });
+    const entries: LogEntry[] = [{ type: "output", text: result.output }];
+
+    if (result.debug) {
+      entries.push({ type: "debug", text: formatDebug(result.debug) });
+    }
+
+    setLog((prev) => [...prev, ...entries]);
     setLoading(false);
+    if (onCommandComplete) {
+      onCommandComplete();
+    }
     if (inputRef.current) {
       inputRef.current.focus();
     }
@@ -45,10 +62,34 @@ export function WorldShell() {
 
   return (
     <>
+      <div className="mb-2 flex items-center justify-end">
+        <label className="flex cursor-pointer items-center gap-2 text-xs text-gray-500">
+          <input
+            type="checkbox"
+            checked={debugMode}
+            onChange={(e) => setDebugMode(e.target.checked)}
+            className="accent-sky-500"
+          />
+          Debug
+        </label>
+      </div>
       <div className="min-h-[300px] max-h-[500px] overflow-y-auto rounded-lg bg-gray-900 p-4 font-mono text-sm whitespace-pre-wrap">
         {log.map((entry, i) => (
-          <div key={i} className={entry.type === "input" ? "text-sky-400" : "text-gray-200"}>
-            {entry.text}
+          <div
+            key={i}
+            className={
+              entry.type === "input"
+                ? "text-sky-400"
+                : entry.type === "debug"
+                  ? "mt-1 border-l-2 border-yellow-700 pl-2 text-xs text-yellow-600"
+                  : "text-gray-200"
+            }
+          >
+            {entry.type === "output" ? (
+              <HighlightedText text={entry.text} onEntityClick={onEntityClick} />
+            ) : (
+              entry.text
+            )}
           </div>
         ))}
         <div ref={logEndRef} />
@@ -73,4 +114,51 @@ export function WorldShell() {
       </form>
     </>
   );
+}
+
+interface DebugEvent {
+  description: string;
+  entityId: string;
+  property?: string;
+  value?: unknown;
+}
+
+interface DebugData {
+  parse?: string;
+  outcome?: string;
+  handler?: string;
+  source?: string;
+  events?: DebugEvent[];
+  vetoedBy?: string;
+}
+
+function formatDebug(debug: DebugData): string {
+  const lines: string[] = [];
+
+  if (debug.parse) {
+    lines.push(`parse: ${debug.parse}`);
+  }
+
+  if (debug.handler) {
+    const src = debug.source ? ` (${debug.source})` : "";
+    lines.push(`handler: ${debug.handler}${src}`);
+  }
+
+  if (debug.outcome === "vetoed" && debug.vetoedBy) {
+    lines.push(`vetoed by: ${debug.vetoedBy}`);
+  }
+
+  if (debug.outcome === "unhandled") {
+    lines.push("no handler matched");
+  }
+
+  if (debug.events && debug.events.length > 0) {
+    for (const event of debug.events) {
+      const prop = event.property ? `.${event.property}` : "";
+      const val = event.value !== undefined ? ` = ${JSON.stringify(event.value)}` : "";
+      lines.push(`  ${event.description}  [${event.entityId}${prop}${val}]`);
+    }
+  }
+
+  return lines.join("\n");
 }

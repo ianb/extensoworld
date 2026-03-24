@@ -103,7 +103,7 @@ export class VerbRegistry {
       if (handler.veto) {
         const veto = handler.veto(context);
         if (veto.blocked) {
-          return { outcome: "vetoed", output: veto.output };
+          return { outcome: "vetoed", output: veto.output, vetoedBy: handler.name };
         }
       }
     }
@@ -126,7 +126,47 @@ export class VerbRegistry {
       }
     }
 
-    return { outcome: "performed", output: result.output, events: result.events };
+    return {
+      outcome: "performed",
+      output: result.output,
+      events: result.events,
+      handler: performer.name,
+      source: performer.source,
+      freeTurn: result.freeTurn || performer.freeTurn || false,
+    };
+  }
+
+  /** Dispatch a system verb like [enter] or [tick]. Returns combined output from all handlers. */
+  dispatchSystem(verb: string, context: VerbContext): string[] {
+    const systemCommand: ResolvedCommand = {
+      form: "intransitive",
+      verb,
+    };
+    const systemContext: VerbContext = { ...context, command: systemCommand };
+    const candidates = this.findHandlers(systemContext);
+    const outputs: string[] = [];
+
+    for (const handler of candidates) {
+      if (handler.check) {
+        const check = handler.check(systemContext);
+        if (!check.applies) continue;
+      }
+      const result = handler.perform(systemContext);
+      if (result.output) {
+        outputs.push(result.output);
+      }
+      for (const event of result.events) {
+        if (event.type === "set-property" && event.property) {
+          systemContext.store.setProperty(event.entityId, {
+            name: event.property,
+            value: event.value,
+          });
+        } else if (event.type === "remove-property" && event.property) {
+          systemContext.store.removeProperty(event.entityId, event.property);
+        }
+      }
+    }
+    return outputs;
   }
 
   private findHandlers(context: VerbContext): VerbHandler[] {
@@ -144,7 +184,10 @@ export class VerbRegistry {
   }
 
   private patternMatches(pattern: VerbPattern, command: ResolvedCommand): boolean {
-    if (pattern.verb !== command.verb) return false;
+    const verbMatches =
+      pattern.verb === command.verb ||
+      (pattern.verbAliases !== undefined && pattern.verbAliases.includes(command.verb));
+    if (!verbMatches) return false;
     if (pattern.form !== command.form) return false;
     if (pattern.prep) {
       const commandPrep = this.getCommandPrep(command);

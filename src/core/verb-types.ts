@@ -25,6 +25,8 @@ export type VetoResult = { blocked: false } | { blocked: true; output: string };
 export interface PerformResult {
   output: string;
   events: WorldEvent[];
+  /** If true, override the handler to NOT consume a turn */
+  freeTurn?: boolean;
 }
 
 export interface WorldEvent {
@@ -47,13 +49,28 @@ export interface EntityRequirements {
 
 export interface VerbPattern {
   verb: string;
+  /** Alternative verb words that match the same handler */
+  verbAliases?: string[];
   form: ParsedCommand["form"];
   prep?: string;
 }
 
+/** System verb names — bracketed to distinguish from player verbs */
+export const SYSTEM_VERBS = {
+  ENTER: "[enter]",
+  LEAVE: "[leave]",
+  TICK: "[tick]",
+} as const;
+
 export interface VerbHandler {
+  /** Human-readable name for debugging, e.g. "take" or "put-in-container" */
+  name: string;
+  /** Source file:line for debugging, e.g. "container-verbs.ts:23" */
+  source?: string;
   pattern: VerbPattern;
   priority: number;
+  /** If true, this action does NOT advance the game clock */
+  freeTurn?: boolean;
   entityId?: string;
   tag?: string;
   objectRequirements?: EntityRequirements;
@@ -71,6 +88,13 @@ export interface VerbContext {
 }
 
 export type DispatchResult =
-  | { outcome: "performed"; output: string; events: WorldEvent[] }
-  | { outcome: "vetoed"; output: string }
+  | {
+      outcome: "performed";
+      output: string;
+      events: WorldEvent[];
+      handler: string;
+      source?: string;
+      freeTurn: boolean;
+    }
+  | { outcome: "vetoed"; output: string; vetoedBy: string }
   | { outcome: "unhandled" };

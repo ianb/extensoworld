@@ -20,5 +20,7 @@ export type { Entity } from "./entity.js";
 export { VerbRegistry, parseCommand, resolveCommand } from "./verbs.js";
 export type { VerbHandler, VerbContext, VerbPattern } from "./verbs.js";
 
+export { SYSTEM_VERBS } from "./verb-types.js";
+
 export { createDefaultVerbs } from "./default-verbs.js";
-export { describeRoomFull } from "./describe.js";
+export { describeRoomFull, entityRef } from "./describe.js";

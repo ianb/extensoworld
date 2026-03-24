@@ -28,14 +28,31 @@ export const appRouter = router({
     return { output: describeCurrentRoom(store) };
   }),
 
-  command: publicProcedure.input(z.object({ text: z.string() })).mutation(({ input }) => {
-    const result = processCommand(store, { input: input.text, verbs });
-    return { output: result.output };
-  }),
+  command: publicProcedure
+    .input(z.object({ text: z.string(), debug: z.boolean().optional() }))
+    .mutation(({ input }) => {
+      const result = processCommand(store, { input: input.text, verbs, debug: input.debug });
+      return { output: result.output, debug: result.debug };
+    }),
 
   reset: publicProcedure.mutation(() => {
     resetWorld();
     return { output: describeCurrentRoom(store) };
+  }),
+
+  entities: publicProcedure.query(() => {
+    const ids = store.getAllIds();
+    return ids.map((id) => {
+      const snap = store.getSnapshot(id);
+      return { id: snap.id, name: (snap.properties["name"] as string) || snap.id, tags: snap.tags };
+    });
+  }),
+
+  entity: publicProcedure.input(z.object({ id: z.string() })).query(({ input }) => {
+    if (!store.has(input.id)) return null;
+    const current = store.getSnapshot(input.id);
+    const initial = store.getInitialState(input.id);
+    return { current, initial };
   }),
 });
 
