@@ -4,7 +4,7 @@
   "description": "A text-based world simulation",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n server,client -c blue,green \"tsx watch src/server/index.ts\" \"vite\"",
+    "dev": "concurrently -n server,client -c blue,green \"tsx watch --env-file=.env src/server/index.ts\" \"vite\"",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
@@ -53,11 +53,14 @@
     ]
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.64",
+    "@ai-sdk/google": "^3.0.53",
     "@tailwindcss/vite": "^4.2.2",
     "@tanstack/react-router": "^1.168.3",
     "@trpc/client": "^11.15.0",
     "@trpc/server": "^11.15.0",
     "@vitejs/plugin-react": "^6.0.1",
+    "ai": "^6.0.138",
     "fastify": "^5.8.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

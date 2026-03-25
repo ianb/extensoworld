@@ -94,6 +94,7 @@ export function WorldShell({
             )}
           </div>
         ))}
+        {loading ? <AiThinkingIndicator /> : null}
         <div ref={logEndRef} />
       </div>
       <form onSubmit={handleSubmit} className="mt-2 flex gap-2">
@@ -118,11 +119,31 @@ export function WorldShell({
   );
 }
 
+function AiThinkingIndicator() {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setVisible(true), 400);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!visible) return null;
+
+  return <div className="text-purple-400 animate-pulse">AI is thinking...</div>;
+}
+
 interface DebugEvent {
   description: string;
   entityId: string;
   property?: string;
   value?: unknown;
+}
+
+interface AiFallbackDebug {
+  systemPrompt: string;
+  prompt: string;
+  response?: unknown;
+  durationMs: number;
 }
 
 interface DebugData {
@@ -132,6 +153,7 @@ interface DebugData {
   source?: string;
   events?: DebugEvent[];
   vetoedBy?: string;
+  aiFallback?: AiFallbackDebug;
 }
 
 function formatDebug(debug: DebugData): string {
@@ -160,6 +182,13 @@ function formatDebug(debug: DebugData): string {
       const val = event.value !== undefined ? ` = ${JSON.stringify(event.value)}` : "";
       lines.push(`  ${event.description}  [${event.entityId}${prop}${val}]`);
     }
+  }
+
+  if (debug.aiFallback) {
+    const ai = debug.aiFallback;
+    lines.push(`\n--- AI Fallback (${ai.durationMs}ms) ---`);
+    lines.push(`prompt:\n${ai.prompt}`);
+    lines.push(`response: ${JSON.stringify(ai.response, null, 2)}`);
   }
 
   return lines.join("\n");

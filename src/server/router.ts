@@ -2,6 +2,8 @@ import { z } from "zod";
 import { router, publicProcedure } from "./trpc.js";
 import { processCommand, describeRoomFull } from "../core/index.js";
 import type { EntityStore } from "../core/index.js";
+import { handleVerbFallback } from "./verb-fallback.js";
+import { loadAiHandlers } from "./ai-handler-store.js";
 import type { GameInstance } from "../games/registry.js";
 import { getGame, listGames } from "../games/registry.js";
 
@@ -24,6 +26,7 @@ function getOrCreateGame(slug: string): GameInstance {
   const def = getGame(slug);
   if (!def) throw new GameNotFoundError(slug);
   const instance = def.create();
+  loadAiHandlers(slug, instance.verbs);
   activeGames.set(slug, instance);
   return instance;
 }
@@ -55,13 +58,33 @@ export const appRouter = router({
 
   command: publicProcedure
     .input(z.object({ gameId: z.string(), text: z.string(), debug: z.boolean().optional() }))
-    .mutation(({ input }) => {
+    .mutation(async ({ input }) => {
       const game = getOrCreateGame(input.gameId);
       const result = processCommand(game.store, {
         input: input.text,
         verbs: game.verbs,
         debug: input.debug,
       });
+      if (result.unhandled) {
+        const fallback = await handleVerbFallback(game.store, {
+          command: result.unhandled.command,
+          player: result.unhandled.player,
+          room: result.unhandled.room,
+          verbs: game.verbs,
+          gameId: input.gameId,
+          debug: input.debug,
+        });
+        return {
+          output: fallback.output,
+          debug: result.debug
+            ? {
+                ...result.debug,
+                outcome: fallback.handler ? `ai-${fallback.handler.name}` : "ai-fallback",
+                aiFallback: fallback.debug,
+              }
+            : undefined,
+        };
+      }
       return { output: result.output, debug: result.debug };
     }),
 

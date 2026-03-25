@@ -1,0 +1,4 @@
+{
+  "provider": "google",
+  "model": "gemini-3-flash-preview"
+}

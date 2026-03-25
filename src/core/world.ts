@@ -13,6 +13,13 @@ export interface DebugInfo {
   source?: string;
   events?: DebugEvent[];
   vetoedBy?: string;
+  /** AI fallback debug info, added by the server layer */
+  aiFallback?: {
+    systemPrompt: string;
+    prompt: string;
+    response: unknown;
+    durationMs: number;
+  };
 }
 
 export interface DebugEvent {
@@ -22,9 +29,17 @@ export interface DebugEvent {
   value?: unknown;
 }
 
+export interface UnhandledContext {
+  command: ResolvedCommand;
+  player: Entity;
+  room: Entity;
+}
+
 export interface CommandResult {
   output: string;
   debug?: DebugInfo;
+  /** Present when the verb was parsed and resolved but no handler matched */
+  unhandled?: UnhandledContext;
 }
 
 const DIRECTION_ALIASES: Record<string, string> = {
@@ -268,6 +283,7 @@ export function processCommand(
   return {
     output: `I don't know how to "${input}". Type "help" for commands.`,
     debug: debug ? { parse: describeParsed(parsed), outcome: "unhandled" } : undefined,
+    unhandled: { command: resolved, player, room },
   };
 }
 
