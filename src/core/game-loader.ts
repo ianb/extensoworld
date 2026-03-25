@@ -4,11 +4,19 @@ import { defineBaseProperties } from "./base-properties.js";
 import { VerbRegistry } from "./verbs.js";
 import type { GameData, EntityData, HandlerData, PropertyData } from "./game-data.js";
 import { handlerDataToHandler } from "./handler-eval.js";
+import type { LibFactory } from "./handler-eval.js";
 import { DEFAULT_HANDLERS } from "./default-handlers.js";
+import { HandlerLib } from "./handler-lib.js";
 
 export interface LoadedGame {
   store: EntityStore;
   verbs: VerbRegistry;
+  libClass: typeof HandlerLib;
+}
+
+export interface LoadGameOptions {
+  libFactory?: LibFactory;
+  libClass?: typeof HandlerLib;
 }
 
 /**
@@ -68,7 +76,7 @@ class MissingMetaError extends Error {
 }
 
 /** Load a game from a GameData object. */
-export function loadGameData(data: GameData): LoadedGame {
+export function loadGameData(data: GameData, options?: LoadGameOptions): LoadedGame {
   const registry = createRegistry();
   defineBaseProperties(registry);
 
@@ -86,15 +94,18 @@ export function loadGameData(data: GameData): LoadedGame {
     });
   }
 
+  const libOpts = options && options.libFactory ? { libFactory: options.libFactory } : undefined;
+
   const verbs = new VerbRegistry();
   for (const handlerData of DEFAULT_HANDLERS) {
-    verbs.register(handlerDataToHandler(handlerData));
+    verbs.register(handlerDataToHandler(handlerData, libOpts));
   }
   if (data.handlers) {
     for (const handlerData of data.handlers) {
-      verbs.register(handlerDataToHandler(handlerData));
+      verbs.register(handlerDataToHandler(handlerData, libOpts));
     }
   }
 
-  return { store, verbs };
+  const libClass = (options && options.libClass) || HandlerLib;
+  return { store, verbs, libClass };
 }

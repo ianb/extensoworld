@@ -144,6 +144,14 @@
         "type": "boolean"
       },
       "defaultValue": false
+    },
+    {
+      "name": "feeCount",
+      "description": "Progress through the fee-fie-foe-foo magic word sequence",
+      "schema": {
+        "type": "number"
+      },
+      "defaultValue": 0
     }
   ]
 }

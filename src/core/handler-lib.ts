@@ -1,8 +1,12 @@
+/* eslint-disable max-lines */
 import type { Entity, EntityStore } from "./entity.js";
 import type { VerbContext, PerformResult, WorldEvent } from "./verb-types.js";
 import { entityRef, itemDisplay, describeRoomFull } from "./describe.js";
 import { isRoomLit, darknessDescription } from "./darkness.js";
 import { renderTemplate } from "./templates.js";
+import { BASE_LIB_DOCS } from "./handler-lib-docs.js";
+
+export type { LibDoc } from "./handler-lib-docs.js";
 
 /**
  * Standard library available to handler code strings as `lib`.
@@ -13,22 +17,22 @@ export class HandlerLib {
   readonly player: Entity;
   readonly room: Entity;
 
+  static libDocs = BASE_LIB_DOCS;
+
+  static describeLib(): string[] {
+    return this.libDocs.map((d) => `lib.${d.signature} — ${d.description}`);
+  }
+
   constructor(context: VerbContext) {
     this.store = context.store;
     this.player = context.player;
     this.room = context.room;
   }
 
-  // --- Display helpers ---
-
-  /** Entity display name wrapped in highlight markers */
   ref(entity: Entity): string {
     return entityRef(entity);
   }
 
-  // --- Event helpers ---
-
-  /** Create a set-property event */
   setEvent(
     entityId: string,
     { property, value, description }: { property: string; value: unknown; description: string },
@@ -36,7 +40,6 @@ export class HandlerLib {
     return { type: "set-property", entityId, property, value, description };
   }
 
-  /** Create a move event (set location property) */
   moveEvent(
     entityId: string,
     { to, from, description }: { to: string; from: string; description: string },
@@ -51,24 +54,18 @@ export class HandlerLib {
     };
   }
 
-  /** Return a simple result with no events */
   result(output: string): PerformResult {
     return { output, events: [] };
   }
 
-  // --- Query helpers ---
-
-  /** Get entities carried by the player */
   carried(): Entity[] {
     return this.store.getContents(this.player.id);
   }
 
-  /** Get entities inside a container/location */
   contents(entityId: string): Entity[] {
     return this.store.getContents(entityId);
   }
 
-  /** Find the key for a lockable entity in the player's inventory */
   findKey(obj: Entity): Entity | null {
     const keyId = obj.properties["unlockedBy"] as string | undefined;
     if (!keyId) return null;
@@ -78,18 +75,12 @@ export class HandlerLib {
     return key;
   }
 
-  /** Check carrying capacity. Returns veto message or null. */
   checkCarryCapacity(): string | null {
     const capacity = (this.player.properties["carryingCapacity"] as number) || 0;
     if (capacity <= 0) return null;
-    const carried = this.carried();
-    if (carried.length >= capacity) {
-      return "You're carrying too many things already.";
-    }
+    if (this.carried().length >= capacity) return "You're carrying too many things already.";
     return null;
   }
-
-  // --- Complete actions (return PerformResult) ---
 
   describeRoom(): PerformResult {
     if (!isRoomLit(this.store, { room: this.room, playerId: this.player.id })) {
@@ -223,25 +214,18 @@ export class HandlerLib {
         }),
       );
     }
-    return {
-      output: `You unlock the ${this.ref(obj)} with the ${this.ref(key)}.`,
-      events,
-    };
+    return { output: `You unlock the ${this.ref(obj)} with the ${this.ref(key)}.`, events };
   }
 
   unlock(obj: Entity): PerformResult {
     const key = this.findKey(obj);
-    if (!key) {
-      return this.result(`You don't have anything to unlock the ${this.ref(obj)} with.`);
-    }
+    if (!key) return this.result(`You don't have anything to unlock the ${this.ref(obj)} with.`);
     return this.unlockWith(obj, key);
   }
 
   lock(obj: Entity): PerformResult {
     const key = this.findKey(obj);
-    if (!key) {
-      return this.result(`You don't have anything to lock the ${this.ref(obj)} with.`);
-    }
+    if (!key) return this.result(`You don't have anything to lock the ${this.ref(obj)} with.`);
     return {
       output: `You lock the ${this.ref(obj)} with the ${this.ref(key)}.`,
       events: [
@@ -293,28 +277,22 @@ export class HandlerLib {
   }
 
   showHelp(): PerformResult {
-    const lines = [
-      "Commands:",
-      "  look/l                - Look around the room",
-      "  look/examine/x <thing> - Examine something",
-      "  go <direction>        - Move (or just n/s/e/w)",
-      "  take/get <thing>      - Pick something up",
-      "  drop <thing>          - Put something down",
-      "  put <thing> in <container> - Place item in container",
-      "  take <thing> from <container> - Remove from container",
-      "  open <thing>          - Open a door or container",
-      "  close <thing>         - Close a door or container",
-      "  inventory/i           - Check what you're carrying",
-    ];
-    return { output: lines.join("\n"), events: [] };
+    return {
+      output: [
+        "Commands:",
+        "  look/l — Look around    examine/x <thing> — Examine something",
+        "  go <dir> (or n/s/e/w) — Move    take/get <thing> — Pick up",
+        "  drop <thing> — Put down    put <thing> in <container>",
+        "  open/close <thing>    inventory/i — Check carrying",
+      ].join("\n"),
+      events: [],
+    };
   }
 
   showScore(): PerformResult {
     const s = (this.player.properties["score"] as number) || 0;
     const maxScore = (this.player.properties["maxScore"] as number) || 0;
-    if (maxScore > 0) {
-      return { output: `Your score is ${s} out of ${maxScore}.`, events: [] };
-    }
+    if (maxScore > 0) return { output: `Your score is ${s} out of ${maxScore}.`, events: [] };
     return { output: `Your score is ${s}.`, events: [] };
   }
 

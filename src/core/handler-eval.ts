@@ -9,6 +9,10 @@ import type {
 import type { HandlerData } from "./game-data.js";
 import { HandlerLib } from "./handler-lib.js";
 
+export type LibFactory = (context: VerbContext) => HandlerLib;
+
+const defaultLibFactory: LibFactory = (context) => new HandlerLib(context);
+
 function getTarget(context: VerbContext): Entity | null {
   if (context.command.form === "transitive" || context.command.form === "prepositional") {
     return context.command.object;
@@ -26,10 +30,10 @@ function getIndirect(context: VerbContext): Entity | null {
   return null;
 }
 
-function buildCheck(code: string): (context: VerbContext) => CheckResult {
+function buildCheck(code: string, createLib: LibFactory): (context: VerbContext) => CheckResult {
   const fn = new Function("lib", "object", "indirect", "player", "room", "store", "command", code);
   return (context: VerbContext): CheckResult => {
-    const lib = new HandlerLib(context);
+    const lib = createLib(context);
     const result = fn(
       lib,
       getTarget(context),
@@ -43,10 +47,10 @@ function buildCheck(code: string): (context: VerbContext) => CheckResult {
   };
 }
 
-function buildVeto(code: string): (context: VerbContext) => VetoResult {
+function buildVeto(code: string, createLib: LibFactory): (context: VerbContext) => VetoResult {
   const fn = new Function("lib", "object", "indirect", "player", "room", "store", "command", code);
   return (context: VerbContext): VetoResult => {
-    const lib = new HandlerLib(context);
+    const lib = createLib(context);
     const result = fn(
       lib,
       getTarget(context),
@@ -63,10 +67,13 @@ function buildVeto(code: string): (context: VerbContext) => VetoResult {
   };
 }
 
-function buildPerform(code: string): (context: VerbContext) => PerformResult {
+function buildPerform(
+  code: string,
+  createLib: LibFactory,
+): (context: VerbContext) => PerformResult {
   const fn = new Function("lib", "object", "indirect", "player", "room", "store", "command", code);
   return (context: VerbContext): PerformResult => {
-    const lib = new HandlerLib(context);
+    const lib = createLib(context);
     const result = fn(
       lib,
       getTarget(context),
@@ -87,7 +94,11 @@ function buildPerform(code: string): (context: VerbContext) => PerformResult {
 }
 
 /** Convert a HandlerData record into a live VerbHandler */
-export function handlerDataToHandler(data: HandlerData): VerbHandler {
+export function handlerDataToHandler(
+  data: HandlerData,
+  options?: { libFactory?: LibFactory },
+): VerbHandler {
+  const createLib = (options && options.libFactory) || defaultLibFactory;
   return {
     name: data.name,
     source: "game-data",
@@ -98,8 +109,8 @@ export function handlerDataToHandler(data: HandlerData): VerbHandler {
     tag: data.tag,
     objectRequirements: data.objectRequirements,
     indirectRequirements: data.indirectRequirements,
-    check: data.check ? buildCheck(data.check) : undefined,
-    veto: data.veto ? buildVeto(data.veto) : undefined,
-    perform: buildPerform(data.perform),
+    check: data.check ? buildCheck(data.check, createLib) : undefined,
+    veto: data.veto ? buildVeto(data.veto, createLib) : undefined,
+    perform: buildPerform(data.perform, createLib),
   };
 }

@@ -180,6 +180,7 @@ export const appRouter = router({
           room: result.unhandled.room,
           verbs: game.verbs,
           gameId: input.gameId,
+          libClass: game.libClass,
           debug: input.debug,
         });
         // Record fallback events

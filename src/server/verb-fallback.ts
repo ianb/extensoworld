@@ -7,6 +7,7 @@ import { getLlm } from "./llm.js";
 import type { AiHandlerRecord } from "./ai-handler-store.js";
 import { saveHandlerRecord, recordToHandler } from "./ai-handler-store.js";
 import { describeProperties, collectTags } from "./ai-prompt-helpers.js";
+import type { HandlerLib } from "../core/handler-lib.js";
 
 export interface FallbackDebugInfo {
   systemPrompt: string;
@@ -105,7 +106,13 @@ function buildPrompt(store: EntityStore, { command }: { command: ResolvedCommand
   return parts.join("\n\n");
 }
 
-const SYSTEM_PROMPT = `You are the game engine for a text adventure. The player has attempted an action that has no built-in handler. You must decide whether this action should work for this type of object.
+function buildSystemPrompt(libClass: typeof HandlerLib): string {
+  const libLines = libClass
+    .describeLib()
+    .map((line) => `  - ${line}`)
+    .join("\n");
+
+  return `You are the game engine for a text adventure. The player has attempted an action that has no built-in handler. You must decide whether this action should work for this type of object.
 
 Your response creates a REUSABLE handler — it should make sense regardless of which room the player is in. Think about the object's nature (its tags, properties, description), not the current situation.
 
@@ -137,24 +144,10 @@ The code has access to these variables:
 - object — the target entity: { id, tags (Set), properties (object) }
 - player — the player entity (same shape)
 - room — the current room entity
-- store — the entity store:
-  - store.get(id) — get entity by ID
-  - store.tryGet(id) — get entity or null
-  - store.getContents(id) — get entities inside this entity
-  - store.findByTag(tag) — find all entities with a tag
+- store — the entity store
 - command — the parsed command
-- lib — helper library with common operations:
-  - lib.result(message) — return a simple result with no state changes
-  - lib.ref(entity) — display name for output text
-  - lib.setEvent(entityId, {property, value, description}) — create a property change event
-  - lib.moveEvent(entityId, {to, from, description}) — create a location change event
-  - lib.carried() — entities the player is carrying
-  - lib.contents(entityId) — entities inside a container
-  - lib.findKey(object) — find the matching key in player inventory
-  - lib.take(object) — pick up an object (returns result + events)
-  - lib.drop(object) — drop an object
-  - lib.open(object) / lib.close(object)
-  - lib.switchOn(object) / lib.switchOff(object)
+- lib — helper library:
+${libLines}
 
 Entity shape: { id: string, tags: Set<string>, properties: { [name]: value } }
 
@@ -213,6 +206,7 @@ Property names MUST come from the Available Properties list. Do not invent new p
 - A "perform" with no events is fine — flavor text is good.
 - Prefer code over static message+events when the handler should react to object state.
 - Keep output to 1-2 sentences in classic text adventure style.`;
+}
 
 /**
  * Convert the LLM response into a perform code string for HandlerData.
@@ -256,6 +250,7 @@ export async function handleVerbFallback(
     room,
     verbs,
     gameId,
+    libClass,
     debug,
   }: {
     command: ResolvedCommand;
@@ -263,9 +258,11 @@ export async function handleVerbFallback(
     room: Entity;
     verbs: VerbRegistry;
     gameId: string;
+    libClass: typeof HandlerLib;
     debug?: boolean;
   },
 ): Promise<FallbackResult> {
+  const systemPrompt = buildSystemPrompt(libClass);
   const prompt = buildPrompt(store, { command });
 
   console.log("[ai-fallback] Calling LLM for:", describeCommand(command));
@@ -274,7 +271,7 @@ export async function handleVerbFallback(
   const result = await generateObject({
     model: getLlm(),
     schema: fallbackResponseSchema,
-    system: SYSTEM_PROMPT,
+    system: systemPrompt,
     prompt,
   });
 
@@ -311,7 +308,7 @@ export async function handleVerbFallback(
   verbs.register(handler);
 
   const debugInfo: FallbackDebugInfo | undefined = debug
-    ? { systemPrompt: SYSTEM_PROMPT, prompt, response, durationMs }
+    ? { systemPrompt, prompt, response, durationMs }
     : undefined;
 
   if (response.decision === "refuse") {

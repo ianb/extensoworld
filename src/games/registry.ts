@@ -1,5 +1,6 @@
 import type { EntityStore } from "../core/entity.js";
 import type { VerbRegistry } from "../core/verbs.js";
+import type { HandlerLib } from "../core/handler-lib.js";
 
 export interface GameDefinition {
   slug: string;
@@ -11,6 +12,7 @@ export interface GameDefinition {
 export interface GameInstance {
   store: EntityStore;
   verbs: VerbRegistry;
+  libClass: typeof HandlerLib;
 }
 
 const games: Map<string, GameDefinition> = new Map();
