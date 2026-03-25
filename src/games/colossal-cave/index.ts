@@ -1,13 +1,5 @@
-import {
-  EntityStore,
-  createRegistry,
-  defineBaseProperties,
-  createDefaultVerbs,
-} from "../../core/index.js";
-import { defineCaveProperties } from "./properties.js";
-import { createAllRooms } from "./rooms.js";
-import { createItems } from "./items.js";
-import { createDoors } from "./doors.js";
+import { loadGameData } from "../../core/game-loader.js";
+import { readGameDir } from "../read-game-dir.js";
 import { xyzzy, plugh, plover, fee, fie, foe, foo, oldMagic } from "./magic-words.js";
 import { catchBird, releaseBird, waterPlant, attackDragon, sayYes, feedBear } from "./puzzles.js";
 import { takeTreasureScoring, dropTreasureScoring } from "./scoring.js";
@@ -24,18 +16,25 @@ import { pirateTick } from "./pirate.js";
 import { caveClosingCheck, caveClosingCountdown, blast } from "./endgame.js";
 import { registerGame } from "../registry.js";
 
+const data = readGameDir(import.meta.dirname!);
+
 registerGame({
-  slug: "colossal-cave",
-  title: "Colossal Cave Adventure",
-  description:
-    "The classic text adventure by Will Crowther and Don Woods. Explore a vast cave system, collect treasures, and avoid dangers.",
+  slug: data.meta.slug,
+  title: data.meta.title,
+  description: data.meta.description,
   create() {
-    const registry = createRegistry();
-    defineBaseProperties(registry);
-    defineCaveProperties(registry);
-    const store = new EntityStore(registry, 42);
-    const verbs = createDefaultVerbs();
+    const game = loadGameData(data);
+
+    // Register game-specific handlers (puzzles, NPCs, magic words, etc.)
     const allHandlers = [
+      xyzzy,
+      plugh,
+      plover,
+      fee,
+      fie,
+      foe,
+      foo,
+      oldMagic,
       catchBird,
       releaseBird,
       waterPlant,
@@ -59,26 +58,11 @@ registerGame({
       caveClosingCountdown,
       blast,
     ];
-    for (const handler of [xyzzy, plugh, plover, fee, fie, foe, foo, oldMagic, ...allHandlers]) {
-      verbs.register(handler);
+    for (const handler of allHandlers) {
+      game.verbs.register(handler);
     }
 
-    createAllRooms(store);
-    createItems(store);
-    createDoors(store);
-
-    // Create the player
-    store.create("player:1", {
-      tags: ["player"],
-      properties: {
-        location: "room:at-end-of-road",
-        name: "Adventurer",
-        carryingCapacity: 7,
-        score: 36,
-        maxScore: 350,
-      },
-    });
-
-    return { store, verbs };
+    game.store.snapshot();
+    return game;
   },
 });

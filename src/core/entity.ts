@@ -4,6 +4,7 @@ import { SeededRandom } from "./random.js";
 import {
   EntityNotFoundError,
   DuplicateEntityError,
+  InvalidEntityIdError,
   UndefinedPropertyError,
   DanglingReferenceError,
   PropertyValueError,
@@ -82,6 +83,9 @@ export class EntityStore {
   }
 
   create(id: string, options: CreateEntityOptions): Entity {
+    if (!id.includes(":")) {
+      throw new InvalidEntityIdError(id);
+    }
     if (this.entities.has(id)) {
       throw new DuplicateEntityError(id);
     }

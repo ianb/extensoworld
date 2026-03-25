@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { generateObject } from "ai";
 import { z } from "zod";
 import type { EntityStore, Entity } from "../core/entity.js";
+import type { EntityData } from "../core/game-data.js";
 import { getLlm } from "./llm.js";
 import { describeProperties, collectTags } from "./ai-prompt-helpers.js";
 
@@ -54,13 +55,10 @@ const createResponseSchema = z.object({
 
 // --- Persistence ---
 
-interface AiEntityRecord {
+type AiEntityRecord = EntityData & {
   createdAt: string;
   gameId: string;
-  entityId: string;
-  tags: string[];
-  properties: Record<string, unknown>;
-}
+};
 
 function entityFilePath(gameId: string): string {
   return resolve(process.cwd(), `data/ai-entities-${gameId}.jsonl`);
@@ -85,7 +83,7 @@ export function getAiEntityIds(gameId: string): Set<string> {
   const content = readFileSync(filePath, "utf-8").trim();
   if (!content) return new Set();
   const records = content.split("\n").map((line) => JSON.parse(line) as AiEntityRecord);
-  return new Set(records.map((r) => r.entityId));
+  return new Set(records.map((r) => r.id));
 }
 
 /** Remove an AI-created entity from the persistence file */
@@ -97,7 +95,7 @@ export function removeAiEntity(gameId: string, entityId: string): boolean {
   const lines = content.split("\n");
   const filtered = lines.filter((line) => {
     const record = JSON.parse(line) as AiEntityRecord;
-    return record.entityId !== entityId;
+    return record.id !== entityId;
   });
   if (filtered.length === lines.length) return false;
   writeFileSync(filePath, filtered.length > 0 ? filtered.join("\n") + "\n" : "");
@@ -112,8 +110,8 @@ export function loadAiEntities(gameId: string, store: EntityStore): void {
   if (!content) return;
   const records = content.split("\n").map((line) => JSON.parse(line) as AiEntityRecord);
   for (const record of records) {
-    if (store.has(record.entityId)) continue;
-    store.create(record.entityId, {
+    if (store.has(record.id)) continue;
+    store.create(record.id, {
       tags: record.tags,
       properties: record.properties,
     });
@@ -233,7 +231,7 @@ export async function handleAiCreate(
   saveEntityRecord({
     createdAt: new Date().toISOString(),
     gameId,
-    entityId,
+    id: entityId,
     tags: response.tags,
     properties,
   });

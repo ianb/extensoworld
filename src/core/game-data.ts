@@ -6,6 +6,8 @@ export interface GameData {
     slug: string;
     title: string;
     description: string;
+    /** Seed for the random number generator (default: 1) */
+    seed?: number;
   };
   properties?: PropertyData[];
   entities: EntityData[];

@@ -28,7 +28,7 @@ export { SeededRandom } from "./random.js";
 export { createGameRunner } from "./game-runner.js";
 export type { GameRunner } from "./game-runner.js";
 
-export { loadGameData } from "./game-loader.js";
+export { loadGameData, parseGameDataJsonl } from "./game-loader.js";
 export type { GameData, EntityData, HandlerData, PropertyData } from "./game-data.js";
 export { HandlerLib } from "./handler-lib.js";
 export { handlerDataToHandler } from "./handler-eval.js";

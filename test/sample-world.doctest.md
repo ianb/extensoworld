@@ -56,7 +56,7 @@ Aliases work for items:
 const g4 = testWorld();
 g4.do("take lamp");
 g4.locationOf("item:lantern")
-=> player
+=> player:1
 ```
 
 ## Locked Doors
@@ -95,4 +95,19 @@ g7.prop("room:deep-woods", "visits")
 g7.walk("south", "north");
 g7.prop("room:deep-woods", "visits")
 => 2
+```
+
+## Entity ID Validation
+
+Entity IDs must follow the `type:name` pattern — bare IDs without a colon are rejected:
+
+```
+const g8 = testWorld();
+g8.runner.store.has("item:test-valid")
+=> false
+```
+
+``` continue
+(() => { try { g8.runner.store.create("badid", { tags: [] }); return "no error"; } catch(_e) { return "threw error"; } })()
+=> threw error
 ```

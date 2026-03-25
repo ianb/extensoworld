@@ -29,6 +29,13 @@ export class DanglingReferenceError extends Error {
   }
 }
 
+export class InvalidEntityIdError extends Error {
+  constructor(public readonly entityId: string) {
+    super(`Entity ID "${entityId}" must contain a colon (e.g. "type:name")`);
+    this.name = "InvalidEntityIdError";
+  }
+}
+
 export class PropertyValueError extends Error {
   constructor(
     public readonly propertyName: string,

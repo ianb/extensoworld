@@ -1,0 +1,6 @@
+{"id":"exit:clearing:to-deep-woods","tags":["exit"],"properties":{"location":"room:clearing","direction":"north","destination":"room:deep-woods","shortDescription":"into the deep woods"}}
+{"id":"exit:clearing:to-hillside","tags":["exit"],"properties":{"location":"room:clearing","direction":"east","destination":"room:hillside","shortDescription":"toward a rocky hillside"}}
+{"id":"exit:deep-woods:to-clearing","tags":["exit"],"properties":{"location":"room:deep-woods","direction":"south","destination":"room:clearing","shortDescription":"back to the clearing"}}
+{"id":"exit:hillside:to-clearing","tags":["exit"],"properties":{"location":"room:hillside","direction":"west","destination":"room:clearing","shortDescription":"down to the clearing"}}
+{"id":"exit:hillside:to-cabin","tags":["exit","openable"],"properties":{"location":"room:hillside","direction":"enter","destination":"room:cabin","name":"Cabin Door","aliases":["door"],"locked":true,"unlockedBy":"item:key","shortDescription":"${self.locked ? 'a locked cabin door' : 'the cabin'}"}}
+{"id":"exit:cabin:to-hillside","tags":["exit"],"properties":{"location":"room:cabin","direction":"out","destination":"room:hillside","shortDescription":"to the hillside"}}

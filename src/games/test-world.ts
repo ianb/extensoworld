@@ -1,11 +1,9 @@
-import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { registerGame } from "./registry.js";
+import { readGameDir } from "./read-game-dir.js";
 import { loadGameData } from "../core/game-loader.js";
-import type { GameData } from "../core/game-data.js";
 
-const thisDir = import.meta.dirname!;
-const data = JSON.parse(readFileSync(resolve(thisDir, "test-world.json"), "utf-8")) as GameData;
+const data = readGameDir(resolve(import.meta.dirname!, "test-world"));
 
 registerGame({
   slug: data.meta.slug,
