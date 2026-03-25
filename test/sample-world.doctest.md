@@ -103,11 +103,13 @@ Entity IDs must follow the `type:name` pattern — bare IDs without a colon are 
 
 ```
 const g8 = testWorld();
-g8.runner.store.has("item:test-valid")
-=> false
+g8.runner.store.create("badid", { tags: [] })
+=> throws InvalidEntityIdError
 ```
 
+The full error message can also be checked:
+
 ``` continue
-(() => { try { g8.runner.store.create("badid", { tags: [] }); return "no error"; } catch(_e) { return "threw error"; } })()
-=> threw error
+g8.runner.store.create("also-bad", { tags: [] })
+=> throws InvalidEntityIdError: Entity ID "also-bad" must contain a colon (e.g. "type:name")
 ```
