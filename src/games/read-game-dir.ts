@@ -1,6 +1,6 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import type { GameData, EntityData, HandlerData } from "../core/game-data.js";
+import type { GameData, GamePrompts, EntityData, HandlerData } from "../core/game-data.js";
 
 /**
  * Read a game directory containing:
@@ -37,10 +37,37 @@ export function readGameDir(dir: string): GameData {
     }
   }
 
+  const prompts = readPrompts(dir);
+
   return {
     meta: manifest.meta,
+    prompts: prompts || undefined,
     properties: manifest.properties,
     entities,
     handlers: handlers.length > 0 ? handlers : undefined,
   };
+}
+
+/** Read prompt .md files from a prompts/ subdirectory */
+function readPrompts(dir: string): GamePrompts | null {
+  const promptDir = resolve(dir, "prompts");
+  if (!existsSync(promptDir)) return null;
+
+  const mapping: Array<[string, keyof GamePrompts]> = [
+    ["world.md", "world"],
+    ["world-verb.md", "worldVerb"],
+    ["world-create.md", "worldCreate"],
+  ];
+
+  const prompts: GamePrompts = {};
+  let hasAny = false;
+  for (const [filename, key] of mapping) {
+    const filePath = resolve(promptDir, filename);
+    if (existsSync(filePath)) {
+      prompts[key] = readFileSync(filePath, "utf-8").trim();
+      hasAny = true;
+    }
+  }
+
+  return hasAny ? prompts : null;
 }

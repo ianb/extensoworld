@@ -23,10 +23,12 @@ function loadConfig(): LlmConfig {
 }
 
 let cachedModel: LanguageModel | null = null;
+let cachedConfig: LlmConfig | null = null;
 
 export function getLlm(): LanguageModel {
   if (cachedModel) return cachedModel;
   const config = loadConfig();
+  cachedConfig = config;
   if (config.provider === "google") {
     const google = createGoogleGenerativeAI();
     cachedModel = google(config.model);
@@ -37,4 +39,19 @@ export function getLlm(): LanguageModel {
     throw new UnknownLlmProviderError(config.provider);
   }
   return cachedModel;
+}
+
+type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+type ProviderOpts = Record<string, Record<string, JsonValue>>;
+
+/** Provider-specific options to enable thinking/reasoning */
+export function getLlmProviderOptions(): ProviderOpts {
+  const config = cachedConfig || loadConfig();
+  if (config.provider === "google") {
+    return { google: { thinkingConfig: { thinkingBudget: 2048 } } };
+  }
+  if (config.provider === "anthropic") {
+    return { anthropic: { thinking: { type: "enabled", budgetTokens: 2048 } } };
+  }
+  return {};
 }

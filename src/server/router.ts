@@ -2,10 +2,17 @@ import { z } from "zod";
 import { router, publicProcedure } from "./trpc.js";
 import { processCommand, describeRoomFull } from "../core/index.js";
 import type { EntityStore } from "../core/index.js";
-import { handleVerbFallback } from "./verb-fallback.js";
 import { loadAiHandlers } from "./ai-handler-store.js";
-import { handleAiCreate, loadAiEntities, getAiEntityIds, removeAiEntity } from "./ai-create.js";
+import { loadAiEntities } from "./ai-entity-store.js";
 import { appendEventLog, replayEventLog, clearEventLog, popEventLog } from "./event-log.js";
+import { composeVerbPrompt, composeCreatePrompt } from "./ai-prompts.js";
+import {
+  handleAiCreateExitCommand,
+  handleAiCreateCommand,
+  handleAiDestroyCommand,
+  handleUnresolvedExit,
+  handleVerbFallbackCommand,
+} from "./ai-commands.js";
 import type { GameInstance } from "../games/registry.js";
 import { getGame, listGames } from "../games/registry.js";
 
@@ -72,19 +79,16 @@ export const appRouter = router({
     .mutation(async ({ input }) => {
       const game = getOrCreateGame(input.gameId);
       const trimmed = input.text.trim();
+      const opts = { gameId: input.gameId, prompts: game.prompts, debug: input.debug };
 
-      // Handle /undo — pop last event log entry and rebuild world
       if (trimmed === "/undo") {
         const popped = popEventLog(input.gameId);
-        if (!popped) {
-          return { output: "Nothing to undo.", debug: undefined };
-        }
+        if (!popped) return { output: "Nothing to undo.", debug: undefined };
         const rebuilt = initGame(input.gameId);
         activeGames.set(input.gameId, rebuilt);
         return { output: "[Undone]\n\n" + describeCurrentRoom(rebuilt.store), debug: undefined };
       }
 
-      // Handle /reset — clear event log, rebuild world (keeping AI entities)
       if (trimmed === "/reset") {
         clearEventLog(input.gameId);
         const rebuilt = initGame(input.gameId);
@@ -92,98 +96,45 @@ export const appRouter = router({
         return { output: "[Reset]\n\n" + describeCurrentRoom(rebuilt.store), debug: undefined };
       }
 
-      // Handle "ai create ..."
+      if (trimmed.startsWith("ai create exit ")) {
+        const instructions = trimmed.slice("ai create exit ".length).trim();
+        if (!instructions)
+          return { output: "Usage: ai create exit <description>", debug: undefined };
+        return handleAiCreateExitCommand(game.store, { instructions, ...opts });
+      }
+
       if (trimmed.startsWith("ai create ")) {
         const description = trimmed.slice("ai create ".length).trim();
-        if (!description) {
-          return { output: "Create what? Usage: ai create <description>", debug: undefined };
-        }
-        const players = game.store.findByTag("player");
-        const player = players[0];
-        if (!player) {
-          return { output: "No player found.", debug: undefined };
-        }
-        const roomId = player.properties["location"] as string;
-        const room = game.store.get(roomId);
-        const result = await handleAiCreate(game.store, {
-          description,
-          room,
-          gameId: input.gameId,
-          debug: input.debug,
-        });
-        const roomDesc = describeCurrentRoom(game.store);
-        return {
-          output: roomDesc,
-          aiOutput: result.output,
-          debug:
-            input.debug && result.debug
-              ? {
-                  parse: `ai create "${description}"`,
-                  outcome: `created ${result.entityId}`,
-                  aiFallback: {
-                    systemPrompt: "",
-                    prompt: result.debug.prompt,
-                    response: result.debug.response,
-                    durationMs: result.debug.durationMs,
-                  },
-                }
-              : undefined,
-        };
+        if (!description) return { output: "Usage: ai create <description>", debug: undefined };
+        return handleAiCreateCommand(game.store, { description, ...opts });
       }
 
-      // Handle "ai destroy ..."
       if (trimmed.startsWith("ai destroy ")) {
         const objectName = trimmed.slice("ai destroy ".length).trim().toLowerCase();
-        if (!objectName) {
-          return { output: "Destroy what? Usage: ai destroy <object>", debug: undefined };
-        }
-        const aiIds = getAiEntityIds(input.gameId);
-        let match: string | null = null;
-        for (const id of aiIds) {
-          if (!game.store.has(id)) continue;
-          const entity = game.store.get(id);
-          const name = ((entity.properties["name"] as string) || "").toLowerCase();
-          const aliases = (entity.properties["aliases"] as string[]) || [];
-          if (
-            name === objectName ||
-            id === objectName ||
-            aliases.some((a) => a.toLowerCase() === objectName)
-          ) {
-            match = id;
-            break;
-          }
-        }
-        if (!match) {
-          return {
-            output: `No AI-created object matching "${objectName}" found.`,
-            debug: undefined,
-          };
-        }
-        const entity = game.store.get(match);
-        const entityName = (entity.properties["name"] as string) || match;
-        game.store.delete(match);
-        removeAiEntity(input.gameId, match);
-        return { output: `[Destroyed ${entityName} (${match})]`, debug: undefined };
+        if (!objectName) return { output: "Usage: ai destroy <object>", debug: undefined };
+        return handleAiDestroyCommand(game.store, { objectName, gameId: input.gameId });
       }
 
-      // Normal command processing
       const result = processCommand(game.store, {
         input: trimmed,
         verbs: game.verbs,
         debug: input.debug,
       });
 
+      if (result.unresolvedExit) {
+        return handleUnresolvedExit(game.store, { context: result.unresolvedExit, ...opts });
+      }
+
       if (result.unhandled) {
-        const fallback = await handleVerbFallback(game.store, {
-          command: result.unhandled.command,
-          player: result.unhandled.player,
-          room: result.unhandled.room,
-          verbs: game.verbs,
+        const fallback = await handleVerbFallbackCommand(game.store, {
+          unhandled: result.unhandled,
           gameId: input.gameId,
+          verbs: game.verbs,
           libClass: game.libClass,
+          prompts: game.prompts,
           debug: input.debug,
+          existingDebug: result.debug,
         });
-        // Record fallback events
         if (fallback.events.length > 0) {
           appendEventLog(input.gameId, {
             command: trimmed,
@@ -191,19 +142,9 @@ export const appRouter = router({
             timestamp: new Date().toISOString(),
           });
         }
-        return {
-          output: fallback.output,
-          debug: result.debug
-            ? {
-                ...result.debug,
-                outcome: fallback.handler ? `ai-${fallback.handler.name}` : "ai-fallback",
-                aiFallback: fallback.debug,
-              }
-            : undefined,
-        };
+        return { output: fallback.output, aiOutput: fallback.aiOutput, debug: fallback.debug };
       }
 
-      // Record events from the command
       if (result.events.length > 0) {
         appendEventLog(input.gameId, {
           command: trimmed,
@@ -252,6 +193,26 @@ export const appRouter = router({
       const initial = game.store.getInitialState(input.id);
       return { current, initial };
     }),
+
+  prompts: publicProcedure.input(gameInput).query(({ input }) => {
+    const game = getOrCreateGame(input.gameId);
+    const players = game.store.findByTag("player");
+    const player = players[0];
+    if (!player)
+      return { verb: "", create: "", world: null, worldVerb: null, worldCreate: null, room: null };
+    const roomId = player.properties["location"] as string;
+    const room = game.store.get(roomId);
+    const promptCtx = { prompts: game.prompts, room };
+    const roomPrompt = (room.properties["aiPrompt"] as string) || null;
+    return {
+      verb: composeVerbPrompt(promptCtx),
+      create: composeCreatePrompt(promptCtx),
+      world: (game.prompts && game.prompts.world) || null,
+      worldVerb: (game.prompts && game.prompts.worldVerb) || null,
+      worldCreate: (game.prompts && game.prompts.worldCreate) || null,
+      room: roomPrompt,
+    };
+  }),
 });
 
 export type AppRouter = typeof appRouter;

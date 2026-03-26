@@ -1,6 +1,7 @@
 import type { EntityStore } from "../core/entity.js";
 import type { VerbRegistry } from "../core/verbs.js";
 import type { HandlerLib } from "../core/handler-lib.js";
+import type { GamePrompts } from "../core/game-data.js";
 
 export interface GameDefinition {
   slug: string;
@@ -13,6 +14,7 @@ export interface GameInstance {
   store: EntityStore;
   verbs: VerbRegistry;
   libClass: typeof HandlerLib;
+  prompts?: GamePrompts;
 }
 
 const games: Map<string, GameDefinition> = new Map();

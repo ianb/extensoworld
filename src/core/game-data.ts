@@ -1,5 +1,15 @@
 import type { ParsedCommand } from "./verb-types.js";
 
+/** Prompt layers for AI guidance — style, tone, constraints */
+export interface GamePrompts {
+  /** General world style/tone prompt */
+  world?: string;
+  /** Additional guidance for verb fallback AI */
+  worldVerb?: string;
+  /** Additional guidance for entity creation AI */
+  worldCreate?: string;
+}
+
 /** Top-level game data file format — loaded from JSON */
 export interface GameData {
   meta: {
@@ -9,6 +19,7 @@ export interface GameData {
     /** Seed for the random number generator (default: 1) */
     seed?: number;
   };
+  prompts?: GamePrompts;
   properties?: PropertyData[];
   entities: EntityData[];
   handlers?: HandlerData[];

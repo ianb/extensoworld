@@ -80,7 +80,7 @@ export function defineBaseProperties(registry: PropertyRegistry): void {
     },
     {
       name: "dark",
-      description: "Whether this room is dark (requires a light source to see)",
+      description: "Room is pitch black — player sees nothing without a light source",
       schema: { type: "boolean" },
       defaultValue: false,
     },
@@ -112,6 +112,17 @@ export function defineBaseProperties(registry: PropertyRegistry): void {
       description: "Remaining power/fuel for a device",
       schema: { type: "number" },
       defaultValue: 0,
+    },
+    {
+      name: "aiPrompt",
+      description: "AI guidance prompt for this entity's location (not shown to players)",
+      schema: { type: "string" },
+    },
+    {
+      name: "destinationIntent",
+      description:
+        "Description of what an unresolved exit should lead to (replaced by destination when materialized)",
+      schema: { type: "string" },
     },
   ] as const;
 

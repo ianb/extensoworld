@@ -3,11 +3,13 @@ import { z } from "zod";
 import type { EntityStore, Entity } from "../core/entity.js";
 import type { ResolvedCommand, VerbHandler, WorldEvent } from "../core/verb-types.js";
 import type { VerbRegistry } from "../core/verbs.js";
-import { getLlm } from "./llm.js";
+import { getLlm, getLlmProviderOptions } from "./llm.js";
 import type { AiHandlerRecord } from "./ai-handler-store.js";
 import { saveHandlerRecord, recordToHandler } from "./ai-handler-store.js";
 import { describeProperties, collectTags } from "./ai-prompt-helpers.js";
 import type { HandlerLib } from "../core/handler-lib.js";
+import type { GamePrompts } from "../core/game-data.js";
+import { composeVerbPrompt } from "./ai-prompts.js";
 
 export interface FallbackDebugInfo {
   systemPrompt: string;
@@ -18,6 +20,7 @@ export interface FallbackDebugInfo {
 
 export interface FallbackResult {
   output: string;
+  notes?: string;
   events: WorldEvent[];
   handler: VerbHandler | null;
   debug?: FallbackDebugInfo;
@@ -51,6 +54,11 @@ const fallbackResponseSchema = z.object({
     .describe(
       "Static property changes. Used for simple perform handlers without code. Properties must exist in the registry.",
     ),
+  notes: z
+    .string()
+    .describe(
+      "Your reasoning about this decision. Explain what choices you made and why. Flag if the action felt ambiguous, if you were unsure about the object's capabilities, if the handler might not generalize well, or if you think the world data may be missing something. This is shown to the game designer, not the player.",
+    ),
 });
 
 function describeCommand(command: ResolvedCommand): string {
@@ -81,7 +89,7 @@ function describeEntityForLlm(entity: Entity): string {
 function buildPrompt(store: EntityStore, { command }: { command: ResolvedCommand }): string {
   const parts: string[] = [];
 
-  parts.push(`## Action\nThe player typed: "${describeCommand(command)}"`);
+  parts.push(`<user-action>\nThe player typed: "${describeCommand(command)}"\n</user-action>`);
 
   const involved: Entity[] = [];
   if (command.form === "transitive" || command.form === "prepositional") {
@@ -96,48 +104,54 @@ function buildPrompt(store: EntityStore, { command }: { command: ResolvedCommand
       const desc = (e.properties["description"] as string) || "No description.";
       return `${describeEntityForLlm(e)}\n  description: "${desc}"`;
     });
-    parts.push(`## Target Object(s)\n${descs.join("\n\n")}`);
+    parts.push(`<target-objects>\n${descs.join("\n\n")}\n</target-objects>`);
   }
 
-  parts.push(`## Available Properties\n${describeProperties(store)}`);
+  parts.push(`<available-properties>\n${describeProperties(store)}\n</available-properties>`);
 
-  parts.push(`## Tags in World\n${collectTags(store).join(", ")}`);
+  parts.push(`<world-tags>\n${collectTags(store).join(", ")}\n</world-tags>`);
 
   return parts.join("\n\n");
 }
 
-function buildSystemPrompt(libClass: typeof HandlerLib): string {
+function buildSystemPrompt(
+  libClass: typeof HandlerLib,
+  { prompts, room }: { prompts?: GamePrompts; room: Entity },
+): string {
   const libLines = libClass
     .describeLib()
     .map((line) => `  - ${line}`)
     .join("\n");
 
-  return `You are the game engine for a text adventure. The player has attempted an action that has no built-in handler. You must decide whether this action should work for this type of object.
+  const styleSection = composeVerbPrompt({ prompts, room });
+
+  return `<role>
+You are the game engine for a text adventure. The player has attempted an action that has no built-in handler. You must decide whether this action should work for this type of object.
 
 Your response creates a REUSABLE handler — it should make sense regardless of which room the player is in. Think about the object's nature (its tags, properties, description), not the current situation.
+</role>
 
-## Decision
+${styleSection}
 
+<decision-format>
 You must choose one of:
 
 - "perform" — the action makes physical/logical sense for this kind of object.
 - "refuse" — you understand the intent, but this shouldn't work for this object. Give a specific, in-character reason in "message".
+</decision-format>
 
-## Refuse handlers
-
+<refuse-handlers>
 Set message to a specific, in-character explanation of why it fails based on the object's nature. Never use generic refusals like "You can't do that."
 
 Example: "The lantern is made of solid brass — you can't break it with your bare hands."
+</refuse-handlers>
 
-## Perform handlers
-
+<perform-handlers>
 For perform, you can respond in two ways:
 
-### Simple (no code): static message + events
-Use "message" for the output text and "events" for property changes. Good for actions with a fixed outcome.
+Simple (no code): static message + events — use "message" for the output text and "events" for property changes. Good for actions with a fixed outcome.
 
-### With code: JavaScript function body
-Use "code" for handlers that need conditional logic (checking properties, different outcomes based on state).
+With code: JavaScript function body — use "code" for handlers that need conditional logic (checking properties, different outcomes based on state).
 
 The code has access to these variables:
 
@@ -152,15 +166,15 @@ ${libLines}
 Entity shape: { id: string, tags: Set<string>, properties: { [name]: value } }
 
 The code MUST return: { output: string, events: WorldEvent[] }
+</perform-handlers>
 
-## Tags
-
+<tags>
 Tags categorize entities and are used to write generic handlers. For example, a "light candle" handler should not check for a specific tinderbox — it should check if the player is carrying anything with the "flame-source" tag. This way any flame source (tinderbox, matches, lit torch) will work.
 
 Use lib.carried() to check what the player is carrying, then filter by tag. The "Tags in World" section lists all tags currently in use.
+</tags>
 
-## Code examples
-
+<code-examples>
 Light a candle (requires a flame source in inventory):
 \`\`\`
 var carried = lib.carried();
@@ -192,20 +206,20 @@ if (object.properties.switchedOn) {
 }
 return lib.result("The lantern rattles. You hear liquid sloshing inside.");
 \`\`\`
+</code-examples>
 
-## Events
-
+<events>
 Property changes. Each event: { type: "set-property", entityId, property, value, description }.
 Property names MUST come from the Available Properties list. Do not invent new properties.
+</events>
 
-## Guidelines
-
+<guidelines>
 - Be conservative. Most unusual actions should be refused.
 - Only "perform" if physically plausible given the object's tags and properties.
 - Do not destroy important game objects without very good reason.
 - A "perform" with no events is fine — flavor text is good.
 - Prefer code over static message+events when the handler should react to object state.
-- Keep output to 1-2 sentences in classic text adventure style.`;
+</guidelines>`;
 }
 
 /**
@@ -251,6 +265,7 @@ export async function handleVerbFallback(
     verbs,
     gameId,
     libClass,
+    prompts,
     debug,
   }: {
     command: ResolvedCommand;
@@ -259,10 +274,11 @@ export async function handleVerbFallback(
     verbs: VerbRegistry;
     gameId: string;
     libClass: typeof HandlerLib;
+    prompts?: GamePrompts;
     debug?: boolean;
   },
 ): Promise<FallbackResult> {
-  const systemPrompt = buildSystemPrompt(libClass);
+  const systemPrompt = buildSystemPrompt(libClass, { prompts, room });
   const prompt = buildPrompt(store, { command });
 
   console.log("[ai-fallback] Calling LLM for:", describeCommand(command));
@@ -273,6 +289,7 @@ export async function handleVerbFallback(
     schema: fallbackResponseSchema,
     system: systemPrompt,
     prompt,
+    providerOptions: getLlmProviderOptions(),
   });
 
   const durationMs = Date.now() - startTime;
@@ -311,8 +328,10 @@ export async function handleVerbFallback(
     ? { systemPrompt, prompt, response, durationMs }
     : undefined;
 
+  const notes = response.notes || undefined;
+
   if (response.decision === "refuse") {
-    return { output: response.message, events: [], handler, debug: debugInfo };
+    return { output: response.message, notes, events: [], handler, debug: debugInfo };
   }
 
   // Execute immediately for the current command
@@ -325,5 +344,11 @@ export async function handleVerbFallback(
     }
   }
 
-  return { output: performResult.output, events: performResult.events, handler, debug: debugInfo };
+  return {
+    output: performResult.output,
+    notes,
+    events: performResult.events,
+    handler,
+    debug: debugInfo,
+  };
 }

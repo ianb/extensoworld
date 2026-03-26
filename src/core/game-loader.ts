@@ -12,6 +12,7 @@ export interface LoadedGame {
   store: EntityStore;
   verbs: VerbRegistry;
   libClass: typeof HandlerLib;
+  prompts?: GameData["prompts"];
 }
 
 export interface LoadGameOptions {
@@ -107,5 +108,5 @@ export function loadGameData(data: GameData, options?: LoadGameOptions): LoadedG
   }
 
   const libClass = (options && options.libClass) || HandlerLib;
-  return { store, verbs, libClass };
+  return { store, verbs, libClass, prompts: data.prompts };
 }

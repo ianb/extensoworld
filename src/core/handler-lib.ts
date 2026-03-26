@@ -1,4 +1,3 @@
-/* eslint-disable max-lines */
 import type { Entity, EntityStore } from "./entity.js";
 import type { VerbContext, PerformResult, WorldEvent } from "./verb-types.js";
 import { entityRef, itemDisplay, describeRoomFull } from "./describe.js";

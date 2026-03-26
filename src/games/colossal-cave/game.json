@@ -11,11 +11,7 @@
       "description": "Size of the beanstalk plant",
       "schema": {
         "type": "string",
-        "enum": [
-          "tiny",
-          "tall",
-          "huge"
-        ]
+        "enum": ["tiny", "tall", "huge"]
       }
     },
     {

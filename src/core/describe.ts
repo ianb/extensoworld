@@ -40,6 +40,10 @@ export function describeRoomFull(
       const rendered = renderTemplate(short, { entity: e, store });
       return `${dir} (${rendered})`;
     }
+    const exitName = e.properties["name"] as string | undefined;
+    if (exitName) {
+      return `${dir} (${exitName})`;
+    }
     return dir;
   });
   const exitList = exitDescs.length > 0 ? exitDescs.join(", ") : "none";

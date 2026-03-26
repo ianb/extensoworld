@@ -1,11 +1,11 @@
-import { readFileSync, appendFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { resolve } from "node:path";
 import { generateObject } from "ai";
 import { z } from "zod";
 import type { EntityStore, Entity } from "../core/entity.js";
-import type { EntityData } from "../core/game-data.js";
-import { getLlm } from "./llm.js";
+import type { GamePrompts } from "../core/game-data.js";
+import { getLlm, getLlmProviderOptions } from "./llm.js";
 import { describeProperties, collectTags } from "./ai-prompt-helpers.js";
+import { composeCreatePrompt } from "./ai-prompts.js";
+import { saveAiEntity } from "./ai-entity-store.js";
 
 export interface AiCreateResult {
   output: string;
@@ -14,6 +14,7 @@ export interface AiCreateResult {
 }
 
 export interface AiCreateDebugInfo {
+  systemPrompt: string;
   prompt: string;
   response: unknown;
   durationMs: number;
@@ -51,72 +52,12 @@ const createResponseSchema = z.object({
     .describe(
       "Additional properties beyond name/description/location/aliases. Must use properties from the Available Properties list.",
     ),
+  notes: z
+    .string()
+    .describe(
+      "Your reasoning about this creation. Explain what choices you made about tags, properties, and style. Flag if the request was vague, if the object might not fit the setting, if you had to guess at properties, or if the world data seems to be missing a tag or property this object needs. This is shown to the game designer, not the player.",
+    ),
 });
-
-// --- Persistence ---
-
-type AiEntityRecord = EntityData & {
-  createdAt: string;
-  gameId: string;
-};
-
-function entityFilePath(gameId: string): string {
-  return resolve(process.cwd(), `data/ai-entities-${gameId}.jsonl`);
-}
-
-function ensureDataDir(): void {
-  const dataDir = resolve(process.cwd(), "data");
-  if (!existsSync(dataDir)) {
-    mkdirSync(dataDir, { recursive: true });
-  }
-}
-
-function saveEntityRecord(record: AiEntityRecord): void {
-  ensureDataDir();
-  appendFileSync(entityFilePath(record.gameId), JSON.stringify(record) + "\n");
-}
-
-/** Get the set of AI-created entity IDs for a game */
-export function getAiEntityIds(gameId: string): Set<string> {
-  const filePath = entityFilePath(gameId);
-  if (!existsSync(filePath)) return new Set();
-  const content = readFileSync(filePath, "utf-8").trim();
-  if (!content) return new Set();
-  const records = content.split("\n").map((line) => JSON.parse(line) as AiEntityRecord);
-  return new Set(records.map((r) => r.id));
-}
-
-/** Remove an AI-created entity from the persistence file */
-export function removeAiEntity(gameId: string, entityId: string): boolean {
-  const filePath = entityFilePath(gameId);
-  if (!existsSync(filePath)) return false;
-  const content = readFileSync(filePath, "utf-8").trim();
-  if (!content) return false;
-  const lines = content.split("\n");
-  const filtered = lines.filter((line) => {
-    const record = JSON.parse(line) as AiEntityRecord;
-    return record.id !== entityId;
-  });
-  if (filtered.length === lines.length) return false;
-  writeFileSync(filePath, filtered.length > 0 ? filtered.join("\n") + "\n" : "");
-  return true;
-}
-
-/** Load all AI-created entities for a game and recreate them in the store */
-export function loadAiEntities(gameId: string, store: EntityStore): void {
-  const filePath = entityFilePath(gameId);
-  if (!existsSync(filePath)) return;
-  const content = readFileSync(filePath, "utf-8").trim();
-  if (!content) return;
-  const records = content.split("\n").map((line) => JSON.parse(line) as AiEntityRecord);
-  for (const record of records) {
-    if (store.has(record.id)) continue;
-    store.create(record.id, {
-      tags: record.tags,
-      properties: record.properties,
-    });
-  }
-}
 
 // --- Prompt building ---
 
@@ -131,29 +72,41 @@ function buildPrompt(
 ): string {
   const parts: string[] = [];
 
-  parts.push(`## Request\nCreate an object: "${description}"`);
+  parts.push(`<user-request>\nai create ${description}\n</user-request>`);
 
   parts.push(
-    `## Current Room\n- ${room.properties["name"] || room.id}: ${room.properties["description"] || "No description."}`,
+    `<current-room>\n- ${room.properties["name"] || room.id}: ${room.properties["description"] || "No description."}\n</current-room>`,
   );
 
   // Show what's already in the room
   const contents = store.getContents(room.id);
   const items = contents.filter((e) => !e.tags.has("exit") && !e.tags.has("player"));
   if (items.length > 0) {
-    parts.push(`## Already in Room\n${items.map(describeEntityForLlm).join("\n")}`);
+    parts.push(`<room-contents>\n${items.map(describeEntityForLlm).join("\n")}\n</room-contents>`);
   }
 
-  parts.push(`## Available Properties\n${describeProperties(store)}`);
-  parts.push(`## Existing Tags\n${collectTags(store).join(", ")}`);
+  parts.push(`<available-properties>\n${describeProperties(store)}\n</available-properties>`);
+  parts.push(`<existing-tags>\n${collectTags(store).join(", ")}\n</existing-tags>`);
 
   return parts.join("\n\n");
 }
 
-const SYSTEM_PROMPT = `You are creating an object for a text adventure game. The player has asked you to create something, and you should produce an entity definition.
+function buildCreateSystemPrompt({
+  prompts,
+  room,
+}: {
+  prompts?: GamePrompts;
+  room: Entity;
+}): string {
+  const styleSection = composeCreatePrompt({ prompts, room });
 
-## Guidelines
+  return `<role>
+You are creating an object for a text adventure game. The player has asked you to create something, and you should produce an entity definition.
+</role>
 
+${styleSection}
+
+<guidelines>
 - The object should fit naturally in the current room.
 - Use existing tags when they apply. Common tags:
   - "portable" — player can pick it up
@@ -165,10 +118,12 @@ const SYSTEM_PROMPT = `You are creating an object for a text adventure game. The
 - Set "portable" tag for anything the player should be able to carry.
 - Set "fixed" property to true for large/immovable things.
 - Provide good aliases — common synonyms the player might use.
-- The description should be vivid but concise, 1-2 sentences, in classic text adventure style. It's what the player sees when they examine the object or look at the room.
+- The description should be vivid but concise, 1-2 sentences. It's what the player sees when they examine the object or look at the room.
 - For properties, only include non-default values. Don't set "open: false" or "locked: false" — those are defaults.
 - The idSlug should be a short kebab-case identifier: "rusty-sword", "sleeping-cat", "oak-table".
-- The idCategory groups the entity: "item", "npc", "furniture", etc.`;
+- The idCategory groups the entity: "item", "npc", "furniture", etc.
+</guidelines>`;
+}
 
 export async function handleAiCreate(
   store: EntityStore,
@@ -176,9 +131,11 @@ export async function handleAiCreate(
     description,
     room,
     gameId,
+    prompts,
     debug,
-  }: { description: string; room: Entity; gameId: string; debug?: boolean },
+  }: { description: string; room: Entity; gameId: string; prompts?: GamePrompts; debug?: boolean },
 ): Promise<AiCreateResult> {
+  const systemPrompt = buildCreateSystemPrompt({ prompts, room });
   const prompt = buildPrompt(store, { description, room });
 
   console.log("[ai-create] Creating:", description);
@@ -187,8 +144,9 @@ export async function handleAiCreate(
   const result = await generateObject({
     model: getLlm(),
     schema: createResponseSchema,
-    system: SYSTEM_PROMPT,
+    system: systemPrompt,
     prompt,
+    providerOptions: getLlmProviderOptions(),
   });
 
   const durationMs = Date.now() - startTime;
@@ -228,7 +186,7 @@ export async function handleAiCreate(
   });
 
   // Persist
-  saveEntityRecord({
+  saveAiEntity({
     createdAt: new Date().toISOString(),
     gameId,
     id: entityId,
@@ -237,7 +195,7 @@ export async function handleAiCreate(
   });
 
   const debugInfo: AiCreateDebugInfo | undefined = debug
-    ? { prompt, response, durationMs }
+    ? { systemPrompt, prompt, response, durationMs }
     : undefined;
 
   // Build a summary of the created entity
@@ -257,6 +215,10 @@ export async function handleAiCreate(
   }
   if (displayProps.length > 0) {
     summaryParts.push(displayProps.join("\n"));
+  }
+
+  if (response.notes) {
+    summaryParts.push(`\nNotes: ${response.notes}`);
   }
 
   return {

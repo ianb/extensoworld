@@ -43,6 +43,22 @@ export function describeProperties(store: EntityStore): string {
   return Object.values(defs).map(formatPropertyDef).join("\n");
 }
 
+/** Filter properties to only include those defined in the store's registry */
+export function filterKnownProperties(
+  store: EntityStore,
+  props: Record<string, unknown>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(props)) {
+    if (store.registry.definitions[key]) {
+      result[key] = value;
+    } else {
+      console.warn(`[ai] Skipping unknown property: ${key}`);
+    }
+  }
+  return result;
+}
+
 export function collectTags(store: EntityStore): string[] {
   const tags = new Set<string>();
   for (const id of store.getAllIds()) {

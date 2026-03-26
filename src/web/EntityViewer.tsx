@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { trpc } from "./trpc.js";
+import { useStickyState } from "./use-sticky-state.js";
 
 interface EntityListItem {
   id: string;
@@ -34,7 +35,7 @@ export function EntityViewer({
   const [entities, setEntities] = useState<EntityListItem[]>([]);
   const [playerRoomId, setPlayerRoomId] = useState<string | null>(null);
   const [details, setDetails] = useState<Map<string, EntityDetailInfo>>(new Map());
-  const [showDiff, setShowDiff] = useState(false);
+  const [showDiff, setShowDiff] = useStickyState("extenso:showDiff", false);
   const [othersExpanded, setOthersExpanded] = useState(false);
 
   useEffect(() => {

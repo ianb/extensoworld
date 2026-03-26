@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { trpc } from "./trpc.js";
 import { HighlightedText } from "./HighlightedText.js";
+import { useStickyState } from "./use-sticky-state.js";
 
 interface LogEntry {
   type: "input" | "output" | "debug" | "system";
@@ -19,7 +20,7 @@ export function WorldShell({
   const [log, setLog] = useState<LogEntry[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [debugMode, setDebugMode] = useState(false);
+  const [debugMode, setDebugMode] = useStickyState("extenso:debugMode", false);
   const logEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -193,7 +194,10 @@ function formatDebug(debug: DebugData): string {
 
   if (debug.aiFallback) {
     const ai = debug.aiFallback;
-    lines.push(`\n--- AI Fallback (${ai.durationMs}ms) ---`);
+    lines.push(`\n--- AI (${ai.durationMs}ms) ---`);
+    if (ai.systemPrompt) {
+      lines.push(`system:\n${ai.systemPrompt}`);
+    }
     lines.push(`prompt:\n${ai.prompt}`);
     lines.push(`response: ${JSON.stringify(ai.response, null, 2)}`);
   }
