@@ -84,17 +84,17 @@ function AiDebugView({ ai }: { ai: AiFallbackDebug }) {
         />
       </div>
       {expandedSection === "system" && ai.systemPrompt ? (
-        <pre className="mt-1 max-h-60 overflow-y-auto rounded bg-gray-800 p-2 text-xs text-yellow-600/80">
+        <pre className="mt-1 max-h-60 overflow-y-auto whitespace-pre-wrap rounded bg-gray-800 p-2 text-xs text-yellow-600/80">
           {ai.systemPrompt}
         </pre>
       ) : null}
       {expandedSection === "prompt" ? (
-        <pre className="mt-1 max-h-60 overflow-y-auto rounded bg-gray-800 p-2 text-xs text-yellow-600/80">
+        <pre className="mt-1 max-h-60 overflow-y-auto whitespace-pre-wrap rounded bg-gray-800 p-2 text-xs text-yellow-600/80">
           {ai.prompt}
         </pre>
       ) : null}
       {expandedSection === "response" ? (
-        <pre className="mt-1 max-h-60 overflow-y-auto rounded bg-gray-800 p-2 text-xs text-yellow-600/80">
+        <pre className="mt-1 max-h-60 overflow-y-auto whitespace-pre-wrap rounded bg-gray-800 p-2 text-xs text-yellow-600/80">
           {JSON.stringify(ai.response, null, 2)}
         </pre>
       ) : null}
