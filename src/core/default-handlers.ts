@@ -19,18 +19,38 @@ export const DEFAULT_HANDLERS: HandlerData[] = [
 
   {
     name: "examine",
-    pattern: { verb: "examine", verbAliases: ["x", "look", "l"], form: "transitive" },
+    pattern: {
+      verb: "examine",
+      verbAliases: ["x", "look", "l", "check", "describe", "read", "watch"],
+      form: "transitive",
+    },
     freeTurn: true,
     perform: "return lib.examine(object);",
   },
 
   {
     name: "take",
-    pattern: { verb: "take", verbAliases: ["get", "g"], form: "transitive" },
+    pattern: {
+      verb: "take",
+      verbAliases: ["get", "g", "grab", "carry", "hold", "pick"],
+      form: "transitive",
+    },
     objectRequirements: { tags: ["portable"] },
     check: "return object.properties.location !== player.id;",
     veto: "return lib.checkCarryCapacity();",
     perform: "return lib.take(object);",
+  },
+
+  {
+    name: "take-fixed",
+    pattern: {
+      verb: "take",
+      verbAliases: ["get", "g", "grab", "carry", "hold", "pick"],
+      form: "transitive",
+    },
+    priority: -5,
+    perform:
+      "if (object.properties.takeRefusal) return lib.result(object.properties.takeRefusal); if (object.properties.fixed) return lib.result('The ' + lib.ref(object) + ' is fixed in place.'); return lib.result('You can\\'t take the ' + lib.ref(object) + '.');",
   },
 
   {
@@ -45,7 +65,7 @@ export const DEFAULT_HANDLERS: HandlerData[] = [
 
   {
     name: "drop",
-    pattern: { verb: "drop", form: "transitive" },
+    pattern: { verb: "drop", verbAliases: ["discard", "throw"], form: "transitive" },
     check: "return object.properties.location === player.id;",
     perform: "return lib.drop(object);",
   },
@@ -59,7 +79,7 @@ export const DEFAULT_HANDLERS: HandlerData[] = [
 
   {
     name: "open",
-    pattern: { verb: "open", form: "transitive" },
+    pattern: { verb: "open", verbAliases: ["unwrap", "uncover"], form: "transitive" },
     objectRequirements: { tags: ["openable"] },
     veto: "if (object.properties.locked) return 'The ' + lib.ref(object) + ' is locked.'; if (object.properties.open) return 'The ' + lib.ref(object) + ' is already open.'; return null;",
     perform: "return lib.open(object);",
@@ -67,7 +87,7 @@ export const DEFAULT_HANDLERS: HandlerData[] = [
 
   {
     name: "close",
-    pattern: { verb: "close", form: "transitive" },
+    pattern: { verb: "close", verbAliases: ["shut", "cover"], form: "transitive" },
     objectRequirements: { tags: ["openable"] },
     veto: "if (!object.properties.open) return 'The ' + lib.ref(object) + ' is already closed.'; return null;",
     perform: "return lib.close(object);",
@@ -75,7 +95,12 @@ export const DEFAULT_HANDLERS: HandlerData[] = [
 
   {
     name: "put-in",
-    pattern: { verb: "put", form: "ditransitive", prep: "containment" },
+    pattern: {
+      verb: "put",
+      verbAliases: ["insert", "place"],
+      form: "ditransitive",
+      prep: "containment",
+    },
     indirectRequirements: { tags: ["container"] },
     check: "return object.properties.location === player.id;",
     veto: "if (indirect.tags.has('openable') && !indirect.properties.open) return 'The ' + lib.ref(indirect) + ' is closed.'; return null;",

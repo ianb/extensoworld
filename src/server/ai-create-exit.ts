@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { EntityStore, Entity } from "../core/entity.js";
 import type { GamePrompts } from "../core/game-data.js";
 import { getLlm, getLlmProviderOptions } from "./llm.js";
-import { describeProperties, collectTags } from "./ai-prompt-helpers.js";
+import { describeProperties, collectTags, buildPropertiesSchema } from "./ai-prompt-helpers.js";
 import { composeCreatePrompt } from "./ai-prompts.js";
 import { saveAiEntity } from "./ai-entity-store.js";
 
@@ -20,37 +20,45 @@ export interface AiCreateExitDebugInfo {
   durationMs: number;
 }
 
-const exitResponseSchema = z.object({
-  direction: z
-    .string()
-    .describe(
-      "The direction label: north, south, east, west, up, down, northeast, northwest, southeast, southwest, or a custom direction like 'inside' or 'through the crack'.",
-    ),
-  name: z.string().describe("Display name for the exit, e.g. 'Wooden Door', 'Narrow Passage'."),
-  description: z
-    .string()
-    .describe(
-      "What the player sees when they examine this exit. Describe it from the current room's perspective. 1-2 sentences.",
-    ),
-  aliases: z
-    .array(z.string())
-    .describe("Alternative names the player can use to refer to this exit."),
-  destinationIntent: z
-    .string()
-    .describe(
-      "A description of what this exit should lead to when materialized. Include tone, setting details, and any constraints. This guides the AI that will create the destination room.",
-    ),
-  properties: z
-    .record(z.string(), z.unknown())
-    .describe(
-      "Additional properties like locked, open. Must use properties from the Available Properties list.",
-    ),
-  notes: z
-    .string()
-    .describe(
-      "Your reasoning about this exit. Explain what direction you chose and why, what the exit looks like from the current room, and what you envision on the other side. Flag if the instructions were vague or if the exit might conflict with existing ones. Shown to the game designer, not the player.",
-    ),
-});
+const EXIT_EXCLUDED_PROPERTIES = [
+  "name",
+  "description",
+  "location",
+  "aliases",
+  "direction",
+  "destination",
+  "destinationIntent",
+];
+
+function buildExitSchema(store: EntityStore) {
+  return z.object({
+    direction: z
+      .string()
+      .describe(
+        "The direction label: north, south, east, west, up, down, northeast, northwest, southeast, southwest, or a custom direction like 'inside' or 'through the crack'.",
+      ),
+    name: z.string().describe("Display name for the exit, e.g. 'Wooden Door', 'Narrow Passage'."),
+    description: z
+      .string()
+      .describe(
+        "What the player sees when they examine this exit. Describe it from the current room's perspective. 1-2 sentences.",
+      ),
+    aliases: z
+      .array(z.string())
+      .describe("Alternative names the player can use to refer to this exit."),
+    destinationIntent: z
+      .string()
+      .describe(
+        "A description of what this exit should lead to when materialized. Include tone, setting details, and any constraints. This guides the AI that will create the destination room.",
+      ),
+    properties: buildPropertiesSchema(store, { exclude: EXIT_EXCLUDED_PROPERTIES }),
+    notes: z
+      .string()
+      .describe(
+        "Your reasoning about this exit. Explain what direction you chose and why, what the exit looks like from the current room, and what you envision on the other side. Flag if the instructions were vague or if the exit might conflict with existing ones. Shown to the game designer, not the player.",
+      ),
+  });
+}
 
 function describeEntityForLlm(entity: Entity): string {
   const tags = Array.from(entity.tags).join(", ");
@@ -137,7 +145,7 @@ export async function handleAiCreateExit(
 
   const result = await generateObject({
     model: getLlm(),
-    schema: exitResponseSchema,
+    schema: buildExitSchema(store),
     system: systemPrompt,
     prompt,
     providerOptions: getLlmProviderOptions(),
@@ -168,8 +176,10 @@ export async function handleAiCreateExit(
     name: response.name,
     description: response.description,
     destinationIntent: response.destinationIntent,
-    ...response.properties,
   };
+  for (const [key, value] of Object.entries(response.properties)) {
+    if (value !== undefined) properties[key] = value;
+  }
   if (response.aliases.length > 0) {
     properties.aliases = response.aliases;
   }

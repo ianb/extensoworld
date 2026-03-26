@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { EntityStore, Entity } from "../core/entity.js";
 import type { GamePrompts } from "../core/game-data.js";
 import { getLlm, getLlmProviderOptions } from "./llm.js";
-import { describeProperties, collectTags } from "./ai-prompt-helpers.js";
+import { describeProperties, collectTags, buildPropertiesSchema } from "./ai-prompt-helpers.js";
 import { composeCreatePrompt } from "./ai-prompts.js";
 import { saveAiEntity } from "./ai-entity-store.js";
 
@@ -20,44 +20,45 @@ export interface AiCreateDebugInfo {
   durationMs: number;
 }
 
-const createResponseSchema = z.object({
-  idSlug: z
-    .string()
-    .describe(
-      'A short kebab-case slug for the entity ID, like "rusty-sword", "sleeping-cat", "oak-table". Will be prefixed with a category and uniquified.',
-    ),
-  idCategory: z.string().describe('Category prefix: "item", "npc", "furniture", etc.'),
-  name: z
-    .string()
-    .describe("The display name of the object, e.g. 'Rusty Sword'. No trailing period."),
-  description: z
-    .string()
-    .describe(
-      "The full description shown when examining the object. 1-2 sentences, classic text adventure style.",
-    ),
-  shortDescription: z
-    .string()
-    .optional()
-    .describe(
-      'Short name variant for inventory/room listings. Only needed if it varies by state, e.g. "Candle (lit)" vs "Candle". Just a few words, not a sentence.',
-    ),
-  tags: z
-    .array(z.string())
-    .describe("Tags for this entity. Use existing tags from the Tags list when applicable."),
-  aliases: z
-    .array(z.string())
-    .describe("Alternative names the player can use to refer to this object."),
-  properties: z
-    .record(z.string(), z.unknown())
-    .describe(
-      "Additional properties beyond name/description/location/aliases. Must use properties from the Available Properties list.",
-    ),
-  notes: z
-    .string()
-    .describe(
-      "Your reasoning about this creation. Explain what choices you made about tags, properties, and style. Flag if the request was vague, if the object might not fit the setting, if you had to guess at properties, or if the world data seems to be missing a tag or property this object needs. This is shown to the game designer, not the player.",
-    ),
-});
+/** Properties that are handled as top-level fields, not in the properties sub-object */
+const EXCLUDED_PROPERTIES = ["name", "description", "shortDescription", "location", "aliases"];
+
+function buildCreateSchema(store: EntityStore) {
+  return z.object({
+    idSlug: z
+      .string()
+      .describe(
+        'A short kebab-case slug for the entity ID, like "rusty-sword", "sleeping-cat", "oak-table". Will be prefixed with a category and uniquified.',
+      ),
+    idCategory: z.string().describe('Category prefix: "item", "npc", "furniture", etc.'),
+    name: z
+      .string()
+      .describe("The display name of the object, e.g. 'Rusty Sword'. No trailing period."),
+    description: z
+      .string()
+      .describe(
+        "The full description shown when examining the object. 1-2 sentences, classic text adventure style.",
+      ),
+    shortDescription: z
+      .string()
+      .optional()
+      .describe(
+        'Short name variant for inventory/room listings. Only needed if it varies by state, e.g. "Candle (lit)" vs "Candle". Just a few words, not a sentence.',
+      ),
+    tags: z
+      .array(z.string())
+      .describe("Tags for this entity. Use existing tags from the Tags list when applicable."),
+    aliases: z
+      .array(z.string())
+      .describe("Alternative names the player can use to refer to this object."),
+    properties: buildPropertiesSchema(store, { exclude: EXCLUDED_PROPERTIES }),
+    notes: z
+      .string()
+      .describe(
+        "Your reasoning about this creation. Explain what choices you made about tags, properties, and style. Flag if the request was vague, if the object might not fit the setting, if you had to guess at properties, or if the world data seems to be missing a tag or property this object needs. This is shown to the game designer, not the player.",
+      ),
+  });
+}
 
 // --- Prompt building ---
 
@@ -116,7 +117,7 @@ ${styleSection}
   - Create new tags when they represent a meaningful category (like "flame-source", "weapon", "edible")
 - Use existing properties from the Available Properties list. Do NOT invent new property names.
 - Set "portable" tag for anything the player should be able to carry.
-- Set "fixed" property to true for large/immovable things.
+- For large/immovable things, set the "fixed" PROPERTY to true (not as a tag) and set "takeRefusal" to a short in-character reason why it can't be taken (e.g., "The moss is growing directly on the cave wall."). Both go in properties, not tags.
 - Provide good aliases — common synonyms the player might use.
 - The description should be vivid but concise, 1-2 sentences. It's what the player sees when they examine the object or look at the room.
 - For properties, only include non-default values. Don't set "open: false" or "locked: false" — those are defaults.
@@ -143,7 +144,7 @@ export async function handleAiCreate(
 
   const result = await generateObject({
     model: getLlm(),
-    schema: createResponseSchema,
+    schema: buildCreateSchema(store),
     system: systemPrompt,
     prompt,
     providerOptions: getLlmProviderOptions(),
@@ -165,13 +166,15 @@ export async function handleAiCreate(
     entityId = `${baseId}-${n}`;
   }
 
-  // Build properties
+  // Build properties — strip undefined values from the typed properties object
   const properties: Record<string, unknown> = {
     location: room.id,
     name: response.name,
     description: response.description,
-    ...response.properties,
   };
+  for (const [key, value] of Object.entries(response.properties)) {
+    if (value !== undefined) properties[key] = value;
+  }
   if (response.shortDescription) {
     properties.shortDescription = response.shortDescription;
   }

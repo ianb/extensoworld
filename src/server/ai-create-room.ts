@@ -4,7 +4,12 @@ import type { EntityStore, Entity } from "../core/entity.js";
 import type { GamePrompts } from "../core/game-data.js";
 import type { WorldEvent } from "../core/verb-types.js";
 import { getLlm, getLlmProviderOptions } from "./llm.js";
-import { describeProperties, collectTags, filterKnownProperties } from "./ai-prompt-helpers.js";
+import {
+  describeProperties,
+  collectTags,
+  filterKnownProperties,
+  buildPropertiesSchema,
+} from "./ai-prompt-helpers.js";
 import { composeCreatePrompt } from "./ai-prompts.js";
 import { saveAiEntity } from "./ai-entity-store.js";
 
@@ -23,73 +28,68 @@ export interface AiCreateRoomDebugInfo {
   durationMs: number;
 }
 
-const roomEntitySchema = z.object({
-  idSlug: z
-    .string()
-    .describe("Short kebab-case slug for the room ID, like 'narrow-cavern', 'sunlit-clearing'."),
-  name: z.string().describe("Display name for the room, e.g. 'Narrow Cavern'."),
-  description: z
-    .string()
-    .describe("Full room description the player sees when they enter or look. 2-4 sentences."),
-  tags: z
-    .array(z.string())
-    .describe("Tags for the room. Always include 'room'. Add 'dark' tag if the room is dark."),
-  properties: z
-    .record(z.string(), z.unknown())
-    .describe(
-      "Room properties like dark, aiPrompt. Must use properties from the Available Properties list.",
-    ),
-  exitUpdate: z
-    .object({
-      name: z.string().optional().describe("New name for the exit, if it should change."),
-      description: z
-        .string()
-        .optional()
-        .describe("New description for the exit, if it should change."),
-    })
-    .optional()
-    .describe(
-      "Optional changes to the exit the player came through, now that the destination is known.",
-    ),
-  additionalExits: z
-    .array(
-      z.object({
-        direction: z.string(),
-        name: z.string(),
-        description: z.string(),
-        destinationIntent: z.string().describe("What this exit should lead to when materialized."),
-        aliases: z.array(z.string()),
-        properties: z.record(z.string(), z.unknown()),
-      }),
-    )
-    .describe(
-      "Additional unresolved exits from the new room (not counting the return exit, which is created automatically). Keep the world expandable but don\u2019t add too many \u2014 1-2 is usually enough.",
-    ),
-  contents: z
-    .array(
-      z.object({
-        idSlug: z.string(),
-        idCategory: z.string(),
-        name: z.string(),
-        description: z.string(),
-        tags: z.array(z.string()),
-        aliases: z.array(z.string()),
-        properties: z.record(z.string(), z.unknown()),
-      }),
-    )
-    .describe(
-      "Objects, NPCs, or furniture to place in the new room. Keep it sparse \u2014 0-2 items. Only include things that make the room interesting or are implied by the intent.",
-    ),
-});
+const ROOM_EXCLUDED = [
+  "name",
+  "description",
+  "location",
+  "aliases",
+  "direction",
+  "destination",
+  "destinationIntent",
+];
 
-const roomResponseSchema = z.object({
-  room: roomEntitySchema,
-  notes: z
-    .string()
-    .describe(
-      "Your reasoning about this room. Explain how you interpreted the exit's destinationIntent, what atmosphere you chose, why you added or didn't add contents. Flag if the intent was vague, if you had to make assumptions, or if the room might not connect well to the world. Shown to the game designer, not the player.",
-    ),
-});
+function buildRoomSchema(store: EntityStore) {
+  const propsSchema = buildPropertiesSchema(store, { exclude: ROOM_EXCLUDED });
+  return z.object({
+    room: z.object({
+      idSlug: z.string().describe("Short kebab-case slug for the room ID."),
+      name: z.string().describe("Display name for the room."),
+      description: z.string().describe("Full room description. 2-4 sentences."),
+      tags: z.array(z.string()).describe("Tags for the room. Always include 'room'."),
+      properties: propsSchema,
+      exitUpdate: z
+        .object({
+          name: z.string().optional().describe("New name for the exit, if it should change."),
+          description: z
+            .string()
+            .optional()
+            .describe("New description for the exit, if it should change."),
+        })
+        .optional()
+        .describe("Optional changes to the exit the player came through."),
+      additionalExits: z
+        .array(
+          z.object({
+            direction: z.string(),
+            name: z.string(),
+            description: z.string(),
+            destinationIntent: z
+              .string()
+              .describe("What this exit should lead to when materialized."),
+            aliases: z.array(z.string()),
+            properties: propsSchema,
+          }),
+        )
+        .describe("Additional unresolved exits (not the return exit). 0-2 exits."),
+      contents: z
+        .array(
+          z.object({
+            idSlug: z.string(),
+            idCategory: z.string(),
+            name: z.string(),
+            description: z.string(),
+            tags: z.array(z.string()),
+            aliases: z.array(z.string()),
+            properties: propsSchema,
+          }),
+        )
+        .describe("Objects/NPCs in the new room. Keep sparse, 0-2 items."),
+    }),
+    notes: z
+      .string()
+      .describe("Your reasoning about this room. Shown to the game designer, not the player."),
+  });
+}
 
 function describeExitForLlm(entity: Entity): string {
   const dir = (entity.properties["direction"] as string) || "?";
@@ -203,7 +203,7 @@ export async function handleAiCreateRoom(
   const startTime = Date.now();
   const result = await generateObject({
     model: getLlm(),
-    schema: roomResponseSchema,
+    schema: buildRoomSchema(store),
     system: systemPrompt,
     prompt,
     providerOptions: getLlmProviderOptions(),

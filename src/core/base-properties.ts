@@ -97,6 +97,11 @@ export function defineBaseProperties(registry: PropertyRegistry): void {
       defaultValue: false,
     },
     {
+      name: "takeRefusal",
+      description: "In-character message when player tries to take a fixed object",
+      schema: { type: "string" },
+    },
+    {
       name: "depositPoints",
       description: "Score points awarded when this treasure is deposited",
       schema: { type: "number" },

@@ -76,9 +76,21 @@ function matchEntityByName(
   return null;
 }
 
-function resolveObject(name: string, visible: Entity[]): Entity | string {
+/** When multiple entities match, prefer one the player is carrying */
+function preferHeld(matches: Entity[], playerId: string): Entity | null {
+  const held = matches.filter((e) => e.properties["location"] === playerId);
+  if (held.length === 1) return held[0]!;
+  return null;
+}
+
+function resolveObject(
+  name: string,
+  { visible, playerId }: { visible: Entity[]; playerId: string },
+): Entity | string {
   const result = matchEntityByName(name, visible);
   if (result instanceof AmbiguousObjectError) {
+    const held = preferHeld(result.matches, playerId);
+    if (held) return held;
     const names = result.matches.map((m) => (m.properties["name"] as string) || m.id);
     return `Which "${name}" do you mean? ${names.join(", ")}`;
   }
@@ -95,23 +107,24 @@ export function resolveCommand(
   }
 
   const visible = findVisibleEntities(store, { roomId, playerId });
+  const ctx = { visible, playerId };
 
   if (parsed.form === "transitive") {
-    const obj = resolveObject(parsed.object, visible);
+    const obj = resolveObject(parsed.object, ctx);
     if (typeof obj === "string") return obj;
     return { form: "transitive", verb: parsed.verb, object: obj };
   }
 
   if (parsed.form === "prepositional") {
-    const obj = resolveObject(parsed.object, visible);
+    const obj = resolveObject(parsed.object, ctx);
     if (typeof obj === "string") return obj;
     return { form: "prepositional", verb: parsed.verb, prep: parsed.prep, object: obj };
   }
 
   // ditransitive
-  const obj = resolveObject(parsed.object, visible);
+  const obj = resolveObject(parsed.object, ctx);
   if (typeof obj === "string") return obj;
-  const indirect = resolveObject(parsed.indirect, visible);
+  const indirect = resolveObject(parsed.indirect, ctx);
   if (typeof indirect === "string") return indirect;
   return {
     form: "ditransitive",
