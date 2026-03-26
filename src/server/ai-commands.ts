@@ -4,6 +4,7 @@ import type { DebugInfo } from "../core/world.js";
 import type { UnresolvedExitContext } from "../core/movement.js";
 import type { VerbRegistry, ResolvedCommand } from "../core/verbs.js";
 import type { WorldEvent } from "../core/verb-types.js";
+import { appendEventLog } from "./event-log.js";
 import type { HandlerLib } from "../core/handler-lib.js";
 import { describeRoomFull } from "../core/describe.js";
 import { handleAiCreate } from "./ai-create.js";
@@ -147,7 +148,6 @@ export async function handleUnresolvedExit(
     debug?: boolean;
   },
 ): Promise<CommandResponse> {
-  console.log("[unresolved-exit] Calling handleAiCreateRoom");
   const result = await handleAiCreateRoom(store, {
     exit: context.exit,
     sourceRoom: context.room,
@@ -155,14 +155,28 @@ export async function handleUnresolvedExit(
     prompts,
     debug,
   });
-  console.log("[unresolved-exit] Room created:", result.roomId);
 
   // Move the player to the new room
   store.setProperty(context.player.id, { name: "location", value: result.roomId });
-  console.log("[unresolved-exit] Player moved, describing room");
+  const moveEvent: WorldEvent = {
+    type: "set-property",
+    entityId: context.player.id,
+    property: "location",
+    value: result.roomId,
+    description: `Moved ${context.direction}`,
+  };
+  const allEvents = [...result.events, moveEvent];
+
+  // Persist events
+  if (allEvents.length > 0) {
+    appendEventLog(gameId, {
+      command: `go ${context.direction}`,
+      events: allEvents,
+      timestamp: new Date().toISOString(),
+    });
+  }
 
   const roomDesc = describeCurrentRoom(store);
-  console.log("[unresolved-exit] Done");
   return {
     output: roomDesc,
     aiOutput: result.notes ? `Notes: ${result.notes}` : undefined,

@@ -2,6 +2,7 @@ import { generateObject } from "ai";
 import { z } from "zod";
 import type { EntityStore, Entity } from "../core/entity.js";
 import type { GamePrompts } from "../core/game-data.js";
+import type { WorldEvent } from "../core/verb-types.js";
 import { getLlm, getLlmProviderOptions } from "./llm.js";
 import { describeProperties, collectTags, filterKnownProperties } from "./ai-prompt-helpers.js";
 import { composeCreatePrompt } from "./ai-prompts.js";
@@ -11,6 +12,7 @@ export interface AiCreateRoomResult {
   output: string;
   notes?: string;
   roomId: string;
+  events: WorldEvent[];
   debug?: AiCreateRoomDebugInfo;
 }
 
@@ -61,7 +63,7 @@ const roomEntitySchema = z.object({
       }),
     )
     .describe(
-      "Additional unresolved exits from the new room (not counting the return exit, which is created automatically). Keep the world expandable but don't add too many \u2014 1-2 is usually enough.",
+      "Additional unresolved exits from the new room (not counting the return exit, which is created automatically). Keep the world expandable but don\u2019t add too many \u2014 1-2 is usually enough.",
     ),
   contents: z
     .array(
@@ -117,35 +119,28 @@ function buildPrompt(
   { exit, sourceRoom }: { exit: Entity; sourceRoom: Entity },
 ): string {
   const parts: string[] = [];
-
   const intent = (exit.properties["destinationIntent"] as string) || "unknown destination";
   const direction = (exit.properties["direction"] as string) || "unknown";
   const exitName = (exit.properties["name"] as string) || exit.id;
-
   parts.push(
     `<exit-context>\nThe player is going ${direction} through "${exitName}".\nDestination intent: ${intent}\nReturn direction: ${reverseDirection(direction)}\nSource room: ${sourceRoom.properties["name"] || sourceRoom.id}\n</exit-context>`,
   );
-
   parts.push(
     `<source-room>\n- ${sourceRoom.properties["name"] || sourceRoom.id}: ${sourceRoom.properties["description"] || "No description."}\n</source-room>`,
   );
-
   const sourceExits = store.getContents(sourceRoom.id).filter((e) => e.tags.has("exit"));
   if (sourceExits.length > 0) {
     parts.push(
       `<source-room-exits>\n${sourceExits.map(describeExitForLlm).join("\n")}\n</source-room-exits>`,
     );
   }
-
   parts.push(`<available-properties>\n${describeProperties(store)}\n</available-properties>`);
   parts.push(`<existing-tags>\n${collectTags(store).join(", ")}\n</existing-tags>`);
-
   return parts.join("\n\n");
 }
 
 function buildSystemPrompt({ prompts, room }: { prompts?: GamePrompts; room: Entity }): string {
   const styleSection = composeCreatePrompt({ prompts, room });
-
   return `<role>
 You are creating a new room for a text adventure game. The player has walked through an exit that leads to an unmaterialized destination. You must create the room, its contents, and any additional exits.
 </role>
@@ -159,10 +154,30 @@ ${styleSection}
 - Add 0-2 additional unresolved exits to keep the world expandable. Each needs a destinationIntent.
 - Add 0-2 contents (objects, NPCs, furniture) only if they make the room interesting or are implied by the intent.
 - You may optionally update the exit the player came through (exitUpdate) if, now that the destination is known, the exit name or description should change.
-- "dark" means pitch black — the player sees nothing without a light source. Don't place visible objects (glowing moss, lit torches) in dark rooms unless they have the "lit" property.
+- "dark" means pitch black \u2014 the player sees nothing without a light source. Don't place visible objects (glowing moss, lit torches) in dark rooms unless they have the "lit" property.
 - Set aiPrompt on the room if there's useful context for future AI operations in this room.
 - Room contents should use existing tags and properties from the available lists.
 </guidelines>`;
+}
+
+function uniqueId(store: EntityStore, baseId: string): string {
+  if (!store.has(baseId)) return baseId;
+  let n = 2;
+  while (store.has(`${baseId}-${n}`)) n += 1;
+  return `${baseId}-${n}`;
+}
+
+function createAndSave(
+  store: EntityStore,
+  {
+    id,
+    tags,
+    properties,
+    gameId,
+  }: { id: string; tags: string[]; properties: Record<string, unknown>; gameId: string },
+): void {
+  store.create(id, { tags, properties });
+  saveAiEntity({ createdAt: new Date().toISOString(), gameId, id, tags, properties });
 }
 
 export async function handleAiCreateRoom(
@@ -183,11 +198,9 @@ export async function handleAiCreateRoom(
 ): Promise<AiCreateRoomResult> {
   const systemPrompt = buildSystemPrompt({ prompts, room: sourceRoom });
   const prompt = buildPrompt(store, { exit, sourceRoom });
-
   const direction = (exit.properties["direction"] as string) || "unknown";
   console.log("[ai-create-room] Materializing room via:", direction);
   const startTime = Date.now();
-
   const result = await generateObject({
     model: getLlm(),
     schema: roomResponseSchema,
@@ -195,141 +208,114 @@ export async function handleAiCreateRoom(
     prompt,
     providerOptions: getLlmProviderOptions(),
   });
-
   const durationMs = Date.now() - startTime;
   const response = result.object;
   const roomData = response.room;
-
   console.log(`[ai-create-room] Created: ${roomData.name} (${durationMs}ms)`);
 
-  // Create room entity
-  const baseRoomId = `room:${roomData.idSlug}`;
-  let roomId = baseRoomId;
-  if (store.has(roomId)) {
-    let n = 2;
-    while (store.has(`${baseRoomId}-${n}`)) {
-      n += 1;
-    }
-    roomId = `${baseRoomId}-${n}`;
-  }
-
-  const roomProps: Record<string, unknown> = filterKnownProperties(store, {
+  // Create room
+  const roomId = uniqueId(store, `room:${roomData.idSlug}`);
+  const roomProps = filterKnownProperties(store, {
     name: roomData.name,
     description: roomData.description,
     ...roomData.properties,
   });
+  createAndSave(store, { id: roomId, tags: roomData.tags, properties: roomProps, gameId });
 
-  console.log("[ai-create-room] Creating room entity:", roomId);
-  store.create(roomId, { tags: roomData.tags, properties: roomProps });
-  saveAiEntity({
-    createdAt: new Date().toISOString(),
-    gameId,
-    id: roomId,
-    tags: roomData.tags,
-    properties: roomProps,
-  });
-
-  // Resolve the exit: set destination, clear intent
-  console.log("[ai-create-room] Resolving exit:", exit.id);
+  // Resolve exit and collect events for persistence
+  const events: WorldEvent[] = [];
   store.setProperty(exit.id, { name: "destination", value: roomId });
+  events.push({
+    type: "set-property",
+    entityId: exit.id,
+    property: "destination",
+    value: roomId,
+    description: "Resolved exit",
+  });
   store.setProperty(exit.id, { name: "destinationIntent", value: undefined });
-
-  // Apply optional exit updates
+  events.push({
+    type: "set-property",
+    entityId: exit.id,
+    property: "destinationIntent",
+    value: undefined,
+    description: "Cleared intent",
+  });
   if (roomData.exitUpdate) {
     if (roomData.exitUpdate.name) {
       store.setProperty(exit.id, { name: "name", value: roomData.exitUpdate.name });
+      events.push({
+        type: "set-property",
+        entityId: exit.id,
+        property: "name",
+        value: roomData.exitUpdate.name,
+        description: "Updated exit name",
+      });
     }
     if (roomData.exitUpdate.description) {
       store.setProperty(exit.id, { name: "description", value: roomData.exitUpdate.description });
+      events.push({
+        type: "set-property",
+        entityId: exit.id,
+        property: "description",
+        value: roomData.exitUpdate.description,
+        description: "Updated exit desc",
+      });
     }
   }
 
-  console.log("[ai-create-room] Creating return exit");
-  const returnDir = reverseDirection(direction);
+  // Return exit
   const roomSlug = roomId.replace("room:", "");
-  const returnExitId = `exit:${roomSlug}:${returnDir}`;
-  const returnExitProps: Record<string, unknown> = {
-    location: roomId,
-    direction: returnDir,
-    destination: sourceRoom.id,
-    name: `Exit ${returnDir}`,
-    description: `Leads back to ${sourceRoom.properties["name"] || sourceRoom.id}.`,
-  };
-  store.create(returnExitId, { tags: ["exit"], properties: returnExitProps });
-  saveAiEntity({
-    createdAt: new Date().toISOString(),
-    gameId,
-    id: returnExitId,
+  const returnDir = reverseDirection(direction);
+  createAndSave(store, {
+    id: `exit:${roomSlug}:${returnDir}`,
     tags: ["exit"],
-    properties: returnExitProps,
+    properties: {
+      location: roomId,
+      direction: returnDir,
+      destination: sourceRoom.id,
+      name: `Exit ${returnDir}`,
+      description: `Leads back to ${sourceRoom.properties["name"] || sourceRoom.id}.`,
+    },
+    gameId,
   });
 
-  console.log("[ai-create-room] Creating additional exits:", roomData.additionalExits.length);
-  for (const exitData of roomData.additionalExits) {
-    const exitDir = exitData.direction.toLowerCase().replace(/\s+/g, "-");
-    const exitId = `exit:${roomSlug}:${exitDir}`;
-    if (store.has(exitId)) continue;
-    const exitProps: Record<string, unknown> = filterKnownProperties(store, {
+  // Additional exits
+  for (const ed of roomData.additionalExits) {
+    const eid = `exit:${roomSlug}:${ed.direction.toLowerCase().replace(/\s+/g, "-")}`;
+    if (store.has(eid)) continue;
+    const ep = filterKnownProperties(store, {
       location: roomId,
-      direction: exitData.direction,
-      name: exitData.name,
-      description: exitData.description,
-      destinationIntent: exitData.destinationIntent,
-      ...exitData.properties,
+      direction: ed.direction,
+      name: ed.name,
+      description: ed.description,
+      destinationIntent: ed.destinationIntent,
+      ...ed.properties,
     });
-    if (exitData.aliases.length > 0) {
-      exitProps.aliases = exitData.aliases;
-    }
-    store.create(exitId, { tags: ["exit"], properties: exitProps });
-    saveAiEntity({
-      createdAt: new Date().toISOString(),
-      gameId,
-      id: exitId,
-      tags: ["exit"],
-      properties: exitProps,
-    });
+    if (ed.aliases.length > 0) ep.aliases = ed.aliases;
+    createAndSave(store, { id: eid, tags: ["exit"], properties: ep, gameId });
   }
 
-  console.log("[ai-create-room] Creating contents:", roomData.contents.length);
+  // Contents
   for (const item of roomData.contents) {
-    const baseItemId = `${item.idCategory}:${item.idSlug}`;
-    let itemId = baseItemId;
-    if (store.has(itemId)) {
-      let n = 2;
-      while (store.has(`${baseItemId}-${n}`)) {
-        n += 1;
-      }
-      itemId = `${baseItemId}-${n}`;
-    }
-    const itemProps: Record<string, unknown> = filterKnownProperties(store, {
+    const iid = uniqueId(store, `${item.idCategory}:${item.idSlug}`);
+    const ip = filterKnownProperties(store, {
       location: roomId,
       name: item.name,
       description: item.description,
       ...item.properties,
     });
-    if (item.aliases.length > 0) {
-      itemProps.aliases = item.aliases;
-    }
-    store.create(itemId, { tags: item.tags, properties: itemProps });
-    saveAiEntity({
-      createdAt: new Date().toISOString(),
-      gameId,
-      id: itemId,
-      tags: item.tags,
-      properties: itemProps,
-    });
+    if (item.aliases.length > 0) ip.aliases = item.aliases;
+    createAndSave(store, { id: iid, tags: item.tags, properties: ip, gameId });
   }
 
   const debugInfo: AiCreateRoomDebugInfo | undefined = debug
     ? { systemPrompt, prompt, response, durationMs }
     : undefined;
-
-  console.log("[ai-create-room] All entities created, building output");
-
   return {
     output: roomData.description,
     notes: response.notes || undefined,
     roomId,
+    events,
     debug: debugInfo,
   };
 }
