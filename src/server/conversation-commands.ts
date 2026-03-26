@@ -60,6 +60,20 @@ export function handleTalkTo(
   };
 }
 
+/** Check command result events for a start-conversation event */
+export function checkForConversationStart(
+  game: GameInstance,
+  { events, gameId }: { events: Array<{ type: string; entityId: string }>; gameId: string },
+): { output: string; conversationMode: { npcName: string; knownWords: string[] } | null } | null {
+  const startEvent = events.find((e) => e.type === "start-conversation");
+  if (!startEvent) return null;
+  const result = handleTalkTo(game, { npcId: startEvent.entityId, gameId });
+  return {
+    output: result.output,
+    conversationMode: result.conversationMode || null,
+  };
+}
+
 /** Handle a single word during an active conversation */
 export async function handleConversationWord(
   game: GameInstance,

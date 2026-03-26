@@ -124,6 +124,11 @@ export function defineBaseProperties(registry: PropertyRegistry): void {
       schema: { type: "string" },
     },
     {
+      name: "scenery",
+      description: "Cached scenery descriptions for atmospheric details in a room",
+      schema: { type: "array" },
+    },
+    {
       name: "destinationIntent",
       description:
         "Description of what an unresolved exit should lead to (replaced by destination when materialized)",

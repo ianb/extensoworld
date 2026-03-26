@@ -16,7 +16,8 @@ import {
 } from "./ai-commands.js";
 import type { GameInstance } from "../games/registry.js";
 import { getGame, listGames } from "../games/registry.js";
-import { handleTalkTo, handleConversationWord } from "./conversation-commands.js";
+import { handleConversationWord, checkForConversationStart } from "./conversation-commands.js";
+import { handleSceneryCheck } from "./scenery-commands.js";
 
 // Import game registrations
 import "../games/test-world.js";
@@ -59,20 +60,6 @@ function describeCurrentRoom(s: EntityStore): string {
   const roomId = player.properties["location"] as string;
   const room = s.get(roomId);
   return describeRoomFull(s, { room, playerId: player.id });
-}
-
-/** Check command result events for a start-conversation event and activate conversation mode */
-function checkForConversationStart(
-  game: GameInstance,
-  { events, gameId }: { events: Array<{ type: string; entityId: string }>; gameId: string },
-): { output: string; conversationMode: { npcName: string; knownWords: string[] } | null } | null {
-  const startEvent = events.find((e) => e.type === "start-conversation");
-  if (!startEvent) return null;
-  const result = handleTalkTo(game, { npcId: startEvent.entityId, gameId });
-  return {
-    output: result.output,
-    conversationMode: result.conversationMode || null,
-  };
 }
 
 const gameInput = z.object({ gameId: z.string() });
@@ -200,6 +187,19 @@ export const appRouter = router({
 
       if (result.unresolvedExit) {
         return handleUnresolvedExit(game.store, { context: result.unresolvedExit, ...opts });
+      }
+
+      // Check for scenery — words in the room description that can be examined
+      if (result.unresolvedObject) {
+        const sceneryResult = await handleSceneryCheck(game, {
+          verb: result.unresolvedObject.verb,
+          objectName: result.unresolvedObject.objectName,
+          gameId: input.gameId,
+          prompts: game.prompts,
+        });
+        if (sceneryResult) {
+          return { output: sceneryResult.output, debug: result.debug };
+        }
       }
 
       if (result.unhandled) {

@@ -48,6 +48,8 @@ export interface CommandResult {
   unhandled?: UnhandledContext;
   /** Present when the player tried to go through an exit with destinationIntent but no destination */
   unresolvedExit?: UnresolvedExitContext;
+  /** Present when the object could not be resolved — includes verb and object name for scenery check */
+  unresolvedObject?: { verb: string; objectName: string };
 }
 
 function dispatchSystemVerbs(
@@ -148,10 +150,18 @@ export function processCommand(
   const resolved = resolveCommand(parsed, { store, roomId: room.id, playerId: player.id });
 
   if (typeof resolved === "string") {
+    // Extract the object name for scenery fallback
+    const objectName =
+      parsed.form === "transitive" || parsed.form === "prepositional"
+        ? parsed.object
+        : parsed.form === "ditransitive"
+          ? parsed.object
+          : undefined;
     return {
       output: resolved,
       events: [],
       debug: debug ? { parse: describeParsed(parsed), outcome: "resolution-failed" } : undefined,
+      unresolvedObject: objectName ? { verb: parsed.verb, objectName } : undefined,
     };
   }
 
