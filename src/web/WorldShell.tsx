@@ -2,10 +2,13 @@ import { useState, useRef, useEffect } from "react";
 import { trpc } from "./trpc.js";
 import { HighlightedText } from "./HighlightedText.js";
 import { useStickyState } from "./use-sticky-state.js";
+import { DebugView } from "./DebugView.js";
+import type { DebugData } from "./DebugView.js";
 
 interface LogEntry {
   type: "input" | "output" | "debug" | "system";
   text: string;
+  debugData?: DebugData;
 }
 
 export function WorldShell({
@@ -68,7 +71,8 @@ export function WorldShell({
     }
 
     if ("debug" in result && result.debug) {
-      entries.push({ type: "debug", text: formatDebug(result.debug as DebugData) });
+      const debugData = result.debug as DebugData;
+      entries.push({ type: "debug", text: "", debugData });
     }
 
     setLog((prev) => [...prev, ...entries]);
@@ -180,6 +184,8 @@ function LogEntryView({
           onTopicClick={(word) => onFillInput(word)}
           onCommandClick={(cmd) => onFillInput(cmd)}
         />
+      ) : entry.type === "debug" && entry.debugData ? (
+        <DebugView debug={entry.debugData} />
       ) : (
         entry.text
       )}
@@ -198,69 +204,4 @@ function AiThinkingIndicator() {
   if (!visible) return null;
 
   return <div className="text-purple-400 animate-pulse">AI is thinking...</div>;
-}
-
-interface DebugEvent {
-  description: string;
-  entityId: string;
-  property?: string;
-  value?: unknown;
-}
-
-interface AiFallbackDebug {
-  systemPrompt: string;
-  prompt: string;
-  response?: unknown;
-  durationMs: number;
-}
-
-interface DebugData {
-  parse?: string;
-  outcome?: string;
-  handler?: string;
-  source?: string;
-  events?: DebugEvent[];
-  vetoedBy?: string;
-  aiFallback?: AiFallbackDebug;
-}
-
-function formatDebug(debug: DebugData): string {
-  const lines: string[] = [];
-
-  if (debug.parse) {
-    lines.push(`parse: ${debug.parse}`);
-  }
-
-  if (debug.handler) {
-    const src = debug.source ? ` (${debug.source})` : "";
-    lines.push(`handler: ${debug.handler}${src}`);
-  }
-
-  if (debug.outcome === "vetoed" && debug.vetoedBy) {
-    lines.push(`vetoed by: ${debug.vetoedBy}`);
-  }
-
-  if (debug.outcome === "unhandled") {
-    lines.push("no handler matched");
-  }
-
-  if (debug.events && debug.events.length > 0) {
-    for (const event of debug.events) {
-      const prop = event.property ? `.${event.property}` : "";
-      const val = event.value !== undefined ? ` = ${JSON.stringify(event.value)}` : "";
-      lines.push(`  ${event.description}  [${event.entityId}${prop}${val}]`);
-    }
-  }
-
-  if (debug.aiFallback) {
-    const ai = debug.aiFallback;
-    lines.push(`\n--- AI (${ai.durationMs}ms) ---`);
-    if (ai.systemPrompt) {
-      lines.push(`system:\n${ai.systemPrompt}`);
-    }
-    lines.push(`prompt:\n${ai.prompt}`);
-    lines.push(`response: ${JSON.stringify(ai.response, null, 2)}`);
-  }
-
-  return lines.join("\n");
 }
