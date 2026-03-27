@@ -96,7 +96,7 @@ export function HighlightedText({
     if (seg.type === "refusal") {
       return (
         <span key={i} className="italic text-gray-300/80">
-          &#x2205; {seg.text}
+          <span className="not-italic text-red-400/70">&#x2205;</span> {seg.text}
         </span>
       );
     }
