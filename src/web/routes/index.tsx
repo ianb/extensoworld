@@ -24,7 +24,7 @@ function HomePage() {
 
   return (
     <div className="mx-auto max-w-2xl p-8">
-      <h1 className="mb-6 text-2xl font-bold">Extensoworld</h1>
+      <h1 className="mb-6 text-2xl font-bold">Rooms Upon Rooms</h1>
       <p className="mb-6 text-gray-400">Choose an adventure:</p>
       <div className="space-y-4">
         {games.map((game) => (

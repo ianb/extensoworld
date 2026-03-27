@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import type { LanguageModel } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
@@ -11,19 +9,39 @@ class UnknownLlmProviderError extends Error {
   }
 }
 
+class LlmNotConfiguredError extends Error {
+  override name = "LlmNotConfiguredError";
+  constructor() {
+    super("LLM not configured — set LLM_PROVIDER and LLM_MODEL environment variables");
+  }
+}
+
 interface LlmConfig {
   provider: "google" | "anthropic";
   model: string;
 }
 
-function loadConfig(): LlmConfig {
-  const configPath = resolve(process.cwd(), "llm-config.json");
-  const raw = readFileSync(configPath, "utf-8");
-  return JSON.parse(raw) as LlmConfig;
-}
-
 let cachedModel: LanguageModel | null = null;
 let cachedConfig: LlmConfig | null = null;
+
+function loadConfig(): LlmConfig {
+  const provider = process.env["LLM_PROVIDER"];
+  const model = process.env["LLM_MODEL"];
+  if (provider && model) {
+    return { provider: provider as LlmConfig["provider"], model };
+  }
+
+  // Fallback: try llm-config.json (Node.js local dev only)
+  try {
+    // Dynamic import to avoid bundling node:fs into the Worker
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require("node:fs");
+    const raw = fs.readFileSync("llm-config.json", "utf-8") as string;
+    return JSON.parse(raw) as LlmConfig;
+  } catch (_e) {
+    throw new LlmNotConfiguredError();
+  }
+}
 
 export function getLlm(): LanguageModel {
   if (cachedModel) return cachedModel;

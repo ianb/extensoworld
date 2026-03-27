@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(whois yetanotherroom.com)",
+      "Bash(whois roomsuponrooms.com)",
+      "Bash(whois justmorerooms.com)",
+      "Bash(whois furtherrooms.com)",
+      "Bash(whois -h whois.verisign-grs.com yetanotherroom.com)",
+      "Bash(whois -h whois.verisign-grs.com roomsuponrooms.com)",
+      "Bash(whois -h whois.verisign-grs.com justmorerooms.com)",
+      "Bash(whois -h whois.verisign-grs.com furtherrooms.com)"
+    ]
+  }
+}

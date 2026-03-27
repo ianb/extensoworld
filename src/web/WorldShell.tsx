@@ -4,11 +4,29 @@ import { HighlightedText } from "./HighlightedText.js";
 import { useStickyState } from "./use-sticky-state.js";
 import { DebugView } from "./DebugView.js";
 import type { DebugData } from "./DebugView.js";
+import { streamCommand } from "./stream-command.js";
 
 interface LogEntry {
   type: "input" | "output" | "debug" | "system";
   text: string;
   debugData?: DebugData;
+}
+
+function resultToLogEntries(result: {
+  output: string;
+  debug?: unknown;
+  aiOutput?: string;
+}): LogEntry[] {
+  const entries: LogEntry[] = [];
+  const aiOutput = "aiOutput" in result ? (result.aiOutput as string) : null;
+  if (aiOutput) {
+    entries.push({ type: "system", text: aiOutput });
+  }
+  entries.push({ type: "output", text: result.output as string });
+  if ("debug" in result && result.debug) {
+    entries.push({ type: "debug", text: "", debugData: result.debug as DebugData });
+  }
+  return entries;
 }
 
 export function WorldShell({
@@ -23,6 +41,7 @@ export function WorldShell({
   const [log, setLog] = useState<LogEntry[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingPhase, setLoadingPhase] = useState<"thinking" | "ai" | null>(null);
   const [debugMode, setDebugMode] = useStickyState("extenso:debugMode", false);
   const [conversationMode, setConversationMode] = useState<{
     npcName: string;
@@ -50,47 +69,37 @@ export function WorldShell({
     const command = input;
     setInput("");
     setLoading(true);
+    setLoadingPhase("thinking");
 
     setLog((prev) => [...prev, { type: "input", text: `> ${command}` }]);
 
     let result;
     try {
-      result = await trpc.command.mutate({ gameId, text: command, debug: debugMode });
+      result = await streamCommand({
+        gameId,
+        text: command,
+        debug: debugMode,
+        onPhase(phase) {
+          if (phase === "ai") setLoadingPhase("ai");
+        },
+      });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       setLog((prev) => [...prev, { type: "output", text: `{!Error: ${message}!}` }]);
       setLoading(false);
+      setLoadingPhase(null);
       return;
     }
-    const entries: LogEntry[] = [];
-    const aiOutput = "aiOutput" in result ? (result.aiOutput as string) : null;
-    if (aiOutput) {
-      entries.push({ type: "system", text: aiOutput });
-    }
-    entries.push({ type: "output", text: result.output });
-
-    // Update conversation mode state
+    const entries = resultToLogEntries(result);
     if ("conversationMode" in result) {
-      const mode = result.conversationMode as {
-        npcName: string;
-        knownWords: string[];
-      } | null;
+      const mode = result.conversationMode as { npcName: string; knownWords: string[] } | null;
       setConversationMode(mode || null);
     }
-
-    if ("debug" in result && result.debug) {
-      const debugData = result.debug as DebugData;
-      entries.push({ type: "debug", text: "", debugData });
-    }
-
     setLog((prev) => [...prev, ...entries]);
     setLoading(false);
-    if (onCommandComplete) {
-      onCommandComplete();
-    }
-    if (inputRef.current) {
-      inputRef.current.focus();
-    }
+    setLoadingPhase(null);
+    if (onCommandComplete) onCommandComplete();
+    if (inputRef.current) inputRef.current.focus();
   }
 
   return (
@@ -132,7 +141,7 @@ export function WorldShell({
             }}
           />
         ))}
-        {loading ? <AiThinkingIndicator /> : null}
+        {loading ? <ThinkingIndicator phase={loadingPhase} /> : null}
         <div ref={logEndRef} />
       </div>
       <form
@@ -201,7 +210,7 @@ function LogEntryView({
   );
 }
 
-function AiThinkingIndicator() {
+function ThinkingIndicator({ phase }: { phase: "thinking" | "ai" | null }) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -209,7 +218,10 @@ function AiThinkingIndicator() {
     return () => clearTimeout(timer);
   }, []);
 
-  if (!visible) return null;
+  if (!visible && phase !== "ai") return null;
 
-  return <div className="text-purple-400 animate-pulse">AI is thinking...</div>;
+  const text = phase === "ai" ? "Asking the AI..." : "Thinking...";
+  const color = phase === "ai" ? "text-purple-400" : "text-gray-400";
+
+  return <div className={`${color} animate-pulse`}>{text}</div>;
 }

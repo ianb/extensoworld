@@ -65,7 +65,7 @@ async function initGame(slug: string): Promise<GameInstance> {
   return instance;
 }
 
-async function getOrCreateGame(slug: string): Promise<GameInstance> {
+export async function getOrCreateGame(slug: string): Promise<GameInstance> {
   const existing = activeGames.get(slug);
   if (existing) return existing;
   const instance = await initGame(slug);
@@ -74,7 +74,7 @@ async function getOrCreateGame(slug: string): Promise<GameInstance> {
 }
 
 /** Reinitialize a game and update the active games map */
-async function reinitGame(slug: string): Promise<GameInstance> {
+export async function reinitGame(slug: string): Promise<GameInstance> {
   const instance = await initGame(slug);
   activeGames.set(slug, instance);
   return instance;

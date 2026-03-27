@@ -9,6 +9,7 @@ import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import "./games/register-bundled.js";
 
 import { appRouter } from "./server/router.js";
+import { handleCommandStream } from "./server/command-stream.js";
 import { setStorage } from "./server/storage-instance.js";
 import { D1Storage } from "./server/storage-d1.js";
 import type { D1Database } from "./server/storage-d1.js";
@@ -24,6 +25,11 @@ export default {
     setStorage(new D1Storage(env.DB));
 
     const url = new URL(request.url);
+
+    // Streaming command endpoint
+    if (url.pathname === "/api/command" && request.method === "POST") {
+      return handleCommandStream(request);
+    }
 
     // Handle tRPC requests
     if (url.pathname.startsWith("/trpc")) {

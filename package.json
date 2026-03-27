@@ -1,5 +1,5 @@
 {
-  "name": "extensoworld",
+  "name": "rooms-upon-rooms",
   "version": "0.1.0",
   "description": "A text-based world simulation",
   "type": "module",
@@ -22,15 +22,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ianb/extensoworld.git"
+    "url": "git+https://github.com/ianb/roomsuponrooms.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/ianb/extensoworld/issues"
+    "url": "https://github.com/ianb/roomsuponrooms/issues"
   },
-  "homepage": "https://github.com/ianb/extensoworld#readme",
+  "homepage": "https://github.com/ianb/roomsuponrooms#readme",
   "devDependencies": {
     "@ianbicking/personal-vibe-check": "file:../personal-vibe-check",
     "@types/node": "^25.5.0",

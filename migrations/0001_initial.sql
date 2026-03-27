@@ -1,4 +1,4 @@
--- Initial schema for extensoworld runtime storage
+-- Initial schema for Rooms Upon Rooms runtime storage
 
 CREATE TABLE IF NOT EXISTS ai_entities (
   game_id TEXT NOT NULL,

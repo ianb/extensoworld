@@ -13,10 +13,23 @@ export interface CommandInput {
   debug?: boolean;
 }
 
+export interface CommandResult {
+  output: string;
+  debug?: unknown;
+  conversationMode?: unknown;
+  aiOutput?: string;
+}
+
+interface ExecuteOptions {
+  game: GameInstance;
+  reinitGame: (slug: string) => Promise<GameInstance>;
+  onAiStart?: () => void;
+}
+
 export async function executeCommand(
   input: CommandInput,
-  { game, reinitGame }: { game: GameInstance; reinitGame: (slug: string) => Promise<GameInstance> },
-): Promise<{ output: string; debug?: unknown; conversationMode?: unknown; aiOutput?: string }> {
+  { game, reinitGame, onAiStart }: ExecuteOptions,
+): Promise<CommandResult> {
   const trimmed = input.text.trim();
   const opts = { gameId: input.gameId, prompts: game.prompts, debug: input.debug };
 
@@ -51,11 +64,13 @@ export async function executeCommand(
   });
 
   if (result.unresolvedExit) {
+    if (onAiStart) onAiStart();
     return handleUnresolvedExit(game.store, { context: result.unresolvedExit, ...opts });
   }
 
   // Check for scenery — words in the room description that can be examined
   if (result.unresolvedObject) {
+    if (onAiStart) onAiStart();
     const sceneryResult = await handleSceneryCheck(game, {
       verb: result.unresolvedObject.verb,
       objectName: result.unresolvedObject.objectName,
@@ -69,6 +84,7 @@ export async function executeCommand(
   }
 
   if (result.unhandled) {
+    if (onAiStart) onAiStart();
     const fallback = await handleVerbFallbackCommand(game.store, {
       unhandled: result.unhandled,
       gameId: input.gameId,
