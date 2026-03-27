@@ -31,26 +31,22 @@ function HomePage() {
         {auth.loading ? null : auth.user ? <UserBadge name={auth.user.displayName} /> : null}
       </div>
 
-      {auth.loading ? null : !auth.user ? (
-        <LoginSection devMode={auth.devMode} />
-      ) : (
-        <>
-          <p className="mb-6 text-gray-400">Choose an adventure:</p>
-          <div className="space-y-4">
-            {games.map((game) => (
-              <Link
-                key={game.slug}
-                to="/game/$gameId"
-                params={{ gameId: game.slug }}
-                className="block rounded-lg border border-gray-700 bg-gray-900 p-4 hover:border-sky-500 hover:bg-gray-800"
-              >
-                <h2 className="text-lg font-bold text-sky-400">{game.title}</h2>
-                <p className="mt-1 text-sm text-gray-400">{game.description}</p>
-              </Link>
-            ))}
-          </div>
-        </>
-      )}
+      {!auth.loading && !auth.user ? <LoginSection devMode={auth.devMode} /> : null}
+
+      <p className="mb-6 text-gray-400">Choose an adventure:</p>
+      <div className="space-y-4">
+        {games.map((game) => (
+          <Link
+            key={game.slug}
+            to="/game/$gameId"
+            params={{ gameId: game.slug }}
+            className="block rounded-lg border border-gray-700 bg-gray-900 p-4 hover:border-sky-500 hover:bg-gray-800"
+          >
+            <h2 className="text-lg font-bold text-sky-400">{game.title}</h2>
+            <p className="mt-1 text-sm text-gray-400">{game.description}</p>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }
@@ -74,8 +70,8 @@ function LoginSection({ devMode }: { devMode: boolean }) {
 
   if (devMode) {
     return (
-      <div className="rounded-lg border border-gray-700 bg-gray-900 p-6">
-        <p className="mb-4 text-gray-400">Enter a name to start playing:</p>
+      <div className="mb-6 rounded-lg border border-gray-700 bg-gray-900 p-6">
+        <p className="mb-4 text-gray-400">Sign in to play:</p>
         <form onSubmit={handleDevLogin} className="flex gap-2">
           <input
             type="text"
@@ -89,7 +85,7 @@ function LoginSection({ devMode }: { devMode: boolean }) {
             type="submit"
             className="rounded bg-sky-700 px-4 py-2 font-medium text-gray-100 hover:bg-sky-600"
           >
-            Start Playing
+            Sign in
           </button>
         </form>
         {error ? <p className="mt-2 text-sm text-red-400">{error}</p> : null}
@@ -98,8 +94,8 @@ function LoginSection({ devMode }: { devMode: boolean }) {
   }
 
   return (
-    <div className="rounded-lg border border-gray-700 bg-gray-900 p-6">
-      <p className="mb-4 text-gray-400">Sign in to start playing:</p>
+    <div className="mb-6 rounded-lg border border-gray-700 bg-gray-900 p-6">
+      <p className="mb-4 text-gray-400">Sign in to play:</p>
       <a
         href="/auth/google"
         className="inline-block rounded bg-sky-700 px-4 py-2 font-medium text-gray-100 hover:bg-sky-600"
