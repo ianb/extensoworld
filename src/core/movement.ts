@@ -62,18 +62,17 @@ export function tryMovement(store: EntityStore, input: string): MovementResult |
       const exitName = (exit.properties["name"] as string) || "way";
       return { output: `{!The ${exitName} is locked.!}`, direction, moved: false, events: [] };
     }
-    // Check for unresolved exit (has intent but no destination)
+    // Unresolved exit — has intent but no destination yet
     if (
       typeof exit.properties["destinationIntent"] === "string" &&
       typeof exit.properties["destination"] !== "string"
     ) {
-      const player = getPlayer(store);
+      const exitName = (exit.properties["name"] as string) || `the way ${direction}`;
       return {
-        output: "",
+        output: `{!${exitName} leads somewhere, but the way is not yet clear.!}`,
         direction,
         moved: false,
         events: [],
-        unresolvedExit: { exit, room, player, direction },
       };
     }
     const events: WorldEvent[] = [];
