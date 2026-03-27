@@ -1,5 +1,11 @@
 import Fastify from "fastify";
 import { fastifyTRPCPlugin } from "@trpc/server/adapters/fastify";
+
+// Register games from disk (fs-based) before importing the router
+import "../games/test-world.js";
+import "../games/colossal-cave/index.js";
+import "../games/the-aaru/index.js";
+
 import { appRouter } from "./router.js";
 
 const server = Fastify();

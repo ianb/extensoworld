@@ -10,10 +10,8 @@ import type { GameInstance } from "../games/registry.js";
 import { getGame, listGames, isValidGameId } from "../games/registry.js";
 import { executeCommand } from "./execute-command.js";
 
-// Import game registrations
-import "../games/test-world.js";
-import "../games/colossal-cave/index.js";
-import "../games/the-aaru/index.js";
+// Game registrations are imported by the entry point (server/index.ts or worker.ts)
+// NOT here, so the router can be used with either fs-based or bundled game data.
 
 const activeGames: Map<string, GameInstance> = new Map();
 

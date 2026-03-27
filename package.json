@@ -15,7 +15,10 @@
     "lint:knip": "knip",
     "lint:circular": "madge --circular --extensions ts,tsx src/",
     "prepare": "husky",
-    "test": "tap"
+    "test": "tap",
+    "bundle-games": "tsx scripts/bundle-game-data.ts",
+    "deploy": "npm run bundle-games && wrangler deploy",
+    "deploy:preview": "npm run bundle-games && wrangler dev"
   },
   "repository": {
     "type": "git",

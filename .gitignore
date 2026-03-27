@@ -5,3 +5,4 @@ dist/
 .tap/
 .env
 data/
+src/games/_bundled-data.ts

@@ -1,0 +1,12 @@
+name = "extensoworld"
+main = "src/worker.ts"
+compatibility_date = "2024-12-01"
+
+[build]
+command = "npx tsx scripts/bundle-game-data.ts"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "extensoworld"
+database_id = "TODO"  # Set after `wrangler d1 create extensoworld`
+migrations_dir = "migrations"
