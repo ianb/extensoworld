@@ -1,0 +1,4 @@
+if [ "$(git rev-parse --abbrev-ref HEAD)" = "main" ]; then
+  echo "Deploying to Cloudflare..."
+  npm run deploy
+fi
