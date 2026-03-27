@@ -53,7 +53,15 @@ export function WorldShell({
 
     setLog((prev) => [...prev, { type: "input", text: `> ${command}` }]);
 
-    const result = await trpc.command.mutate({ gameId, text: command, debug: debugMode });
+    let result;
+    try {
+      result = await trpc.command.mutate({ gameId, text: command, debug: debugMode });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setLog((prev) => [...prev, { type: "output", text: `{!Error: ${message}!}` }]);
+      setLoading(false);
+      return;
+    }
     const entries: LogEntry[] = [];
     const aiOutput = "aiOutput" in result ? (result.aiOutput as string) : null;
     if (aiOutput) {

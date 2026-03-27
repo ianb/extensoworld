@@ -239,19 +239,7 @@ export async function handleVerbFallback(
   }
 
   // Execute immediately for the current command
-  let performResult;
-  try {
-    performResult = handler.perform({ store, command, player, room });
-  } catch (execErr: unknown) {
-    console.error("[ai-fallback] Handler execution failed:", execErr);
-    return {
-      output: response.message || "Something happened, but the result was unclear.",
-      notes,
-      events: [],
-      handler,
-      debug: debugInfo,
-    };
-  }
+  const performResult = handler.perform({ store, command, player, room });
 
   // Apply events
   for (const event of performResult.events) {

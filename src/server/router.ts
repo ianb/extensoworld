@@ -1,23 +1,14 @@
 import { z } from "zod";
 import { router, publicProcedure } from "./trpc.js";
-import { processCommand, describeRoomFull } from "../core/index.js";
+import { describeRoomFull } from "../core/index.js";
 import type { EntityStore } from "../core/index.js";
 import { loadAiHandlers } from "./ai-handler-store.js";
 import { loadAiEntities } from "./ai-entity-store.js";
-import { appendEventLog, replayEventLog, clearEventLog, popEventLog } from "./event-log.js";
+import { replayEventLog } from "./event-log.js";
 import { composeVerbPrompt, composeCreatePrompt } from "./ai-prompts.js";
-import {
-  handleAiCreateExitCommand,
-  handleAiCreateCommand,
-  handleAiDestroyCommand,
-  handleAiDestroyVerbCommand,
-  handleUnresolvedExit,
-  handleVerbFallbackCommand,
-} from "./ai-commands.js";
 import type { GameInstance } from "../games/registry.js";
 import { getGame, listGames } from "../games/registry.js";
-import { handleConversationWord, checkForConversationStart } from "./conversation-commands.js";
-import { handleSceneryCheck } from "./scenery-commands.js";
+import { executeCommand } from "./execute-command.js";
 
 // Import game registrations
 import "../games/test-world.js";
@@ -53,6 +44,13 @@ function getOrCreateGame(slug: string): GameInstance {
   return instance;
 }
 
+/** Reinitialize a game and update the active games map */
+function reinitGame(slug: string): GameInstance {
+  const instance = initGame(slug);
+  activeGames.set(slug, instance);
+  return instance;
+}
+
 function describeCurrentRoom(s: EntityStore): string {
   const players = s.findByTag("player");
   const player = players[0];
@@ -60,85 +58,6 @@ function describeCurrentRoom(s: EntityStore): string {
   const roomId = player.properties["location"] as string;
   const room = s.get(roomId);
   return describeRoomFull(s, { room, playerId: player.id });
-}
-
-interface CommandOpts {
-  gameId: string;
-  prompts?: GameInstance["prompts"];
-  debug?: boolean;
-}
-
-type CommandReturn =
-  | { output: string; debug?: unknown }
-  | Promise<{ output: string; debug?: unknown }>;
-
-function handleSpecialCommand(
-  trimmed: string,
-  { game, gameId, opts }: { game: GameInstance; gameId: string; opts: CommandOpts },
-): CommandReturn | null {
-  if (trimmed === "/undo") {
-    const popped = popEventLog(gameId);
-    if (!popped) return { output: "Nothing to undo.", debug: undefined };
-    const rebuilt = initGame(gameId);
-    activeGames.set(gameId, rebuilt);
-    return { output: "[Undone]\n\n" + describeCurrentRoom(rebuilt.store), debug: undefined };
-  }
-
-  if (trimmed === "/reset") {
-    clearEventLog(gameId);
-    const rebuilt = initGame(gameId);
-    activeGames.set(gameId, rebuilt);
-    return { output: "[Reset]\n\n" + describeCurrentRoom(rebuilt.store), debug: undefined };
-  }
-
-  if (trimmed === "help ai") {
-    return {
-      output: [
-        "AI & World-Editing Commands:",
-        "  ai create <description>      — Create an object in the current room",
-        "  ai create exit <description> — Create a new exit from the current room",
-        "  ai destroy <object>          — Remove an AI-created object",
-        "  ai destroy verb <search>     — Find and remove an AI-created verb handler",
-        "",
-        "System:",
-        "  /undo  — Undo the last action",
-        "  /reset — Reset the game to its initial state",
-      ].join("\n"),
-      debug: undefined,
-    };
-  }
-
-  if (trimmed.startsWith("ai create exit ")) {
-    const instructions = trimmed.slice("ai create exit ".length).trim();
-    if (!instructions) return { output: "Usage: ai create exit <description>", debug: undefined };
-    return handleAiCreateExitCommand(game.store, { instructions, ...opts });
-  }
-
-  if (trimmed.startsWith("ai create ")) {
-    const description = trimmed.slice("ai create ".length).trim();
-    if (!description) return { output: "Usage: ai create <description>", debug: undefined };
-    return handleAiCreateCommand(game.store, { description, ...opts });
-  }
-
-  if (trimmed.startsWith("ai destroy verb confirm ")) {
-    const name = trimmed.slice("ai destroy verb confirm ".length).trim();
-    if (!name) return { output: "Usage: ai destroy verb confirm <name>", debug: undefined };
-    return handleAiDestroyVerbCommand({ search: name, confirm: true, gameId, verbs: game.verbs });
-  }
-
-  if (trimmed.startsWith("ai destroy verb ")) {
-    const search = trimmed.slice("ai destroy verb ".length).trim();
-    if (!search) return { output: "Usage: ai destroy verb <search>", debug: undefined };
-    return handleAiDestroyVerbCommand({ search, confirm: false, gameId, verbs: game.verbs });
-  }
-
-  if (trimmed.startsWith("ai destroy ")) {
-    const objectName = trimmed.slice("ai destroy ".length).trim().toLowerCase();
-    if (!objectName) return { output: "Usage: ai destroy <object>", debug: undefined };
-    return handleAiDestroyCommand(game.store, { objectName, gameId });
-  }
-
-  return null;
 }
 
 const gameInput = z.object({ gameId: z.string() });
@@ -161,108 +80,17 @@ export const appRouter = router({
     .input(z.object({ gameId: z.string(), text: z.string(), debug: z.boolean().optional() }))
     .mutation(async ({ input }) => {
       const game = getOrCreateGame(input.gameId);
-      const trimmed = input.text.trim();
-      const opts = { gameId: input.gameId, prompts: game.prompts, debug: input.debug };
-
-      // If in conversation mode, route single-word input to conversation engine
-      if (game.conversationState) {
-        const convResult = await handleConversationWord(game, {
-          word: trimmed,
-          gameId: input.gameId,
-        });
-        return {
-          output: convResult.output,
-          conversationMode: convResult.conversationMode,
-          debug: undefined,
-        };
+      try {
+        return await executeCommand(input, { game, reinitGame });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error("[command] Error:", err);
+        return { output: `{!Error: ${message}!}`, debug: undefined };
       }
-
-      const special = handleSpecialCommand(trimmed, { game, gameId: input.gameId, opts });
-      if (special) return special;
-
-      // Extract [bracketed instructions] for AI guidance
-      const bracketMatch = /\[([^\]]+)]/.exec(trimmed);
-      const aiInstructions = bracketMatch ? bracketMatch[1] : undefined;
-      const commandText = bracketMatch
-        ? trimmed.slice(0, bracketMatch.index).trim() +
-          trimmed.slice(bracketMatch.index + bracketMatch[0].length).trim()
-        : trimmed;
-
-      const result = processCommand(game.store, {
-        input: commandText,
-        verbs: game.verbs,
-        debug: input.debug,
-      });
-
-      if (result.unresolvedExit) {
-        return handleUnresolvedExit(game.store, { context: result.unresolvedExit, ...opts });
-      }
-
-      // Check for scenery — words in the room description that can be examined
-      if (result.unresolvedObject) {
-        const sceneryResult = await handleSceneryCheck(game, {
-          verb: result.unresolvedObject.verb,
-          objectName: result.unresolvedObject.objectName,
-          gameId: input.gameId,
-          prompts: game.prompts,
-          debug: input.debug,
-        });
-        if (sceneryResult) {
-          return { output: sceneryResult.output, debug: sceneryResult.debug || result.debug };
-        }
-      }
-
-      if (result.unhandled) {
-        const fallback = await handleVerbFallbackCommand(game.store, {
-          unhandled: result.unhandled,
-          gameId: input.gameId,
-          verbs: game.verbs,
-          libClass: game.libClass,
-          prompts: game.prompts,
-          debug: input.debug,
-          existingDebug: result.debug,
-          aiInstructions,
-        });
-        if (fallback.events.length > 0) {
-          appendEventLog(input.gameId, {
-            command: trimmed,
-            events: fallback.events,
-            timestamp: new Date().toISOString(),
-          });
-        }
-        return { output: fallback.output, aiOutput: fallback.aiOutput, debug: fallback.debug };
-      }
-
-      // Don't persist start-conversation events (ephemeral)
-      const persistEvents = result.events.filter((e) => e.type !== "start-conversation");
-      if (persistEvents.length > 0) {
-        appendEventLog(input.gameId, {
-          command: trimmed,
-          events: persistEvents,
-          timestamp: new Date().toISOString(),
-        });
-      }
-
-      // Check if a start-conversation event was emitted
-      const convStart = checkForConversationStart(game, {
-        events: result.events,
-        gameId: input.gameId,
-      });
-      if (convStart) {
-        return {
-          output: convStart.output,
-          conversationMode: convStart.conversationMode,
-          debug: result.debug,
-        };
-      }
-
-      return { output: result.output, debug: result.debug };
     }),
 
   reset: publicProcedure.input(gameInput).mutation(({ input }) => {
-    clearEventLog(input.gameId);
-    const instance = initGame(input.gameId);
-    activeGames.set(input.gameId, instance);
+    const instance = reinitGame(input.gameId);
     return { output: describeCurrentRoom(instance.store) };
   }),
 
