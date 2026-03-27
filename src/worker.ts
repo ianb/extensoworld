@@ -23,6 +23,9 @@ interface Env {
   JWT_SECRET: string;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
+  LLM_PROVIDER: string;
+  LLM_MODEL: string;
+  GOOGLE_GENERATIVE_AI_API_KEY: string;
 }
 
 function getAuthEnv(env: Env, request: Request): AuthEnv {
@@ -53,6 +56,11 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     // Set D1 storage for this request
     setStorage(new D1Storage(env.DB));
+
+    // Expose secrets as process.env for modules that read from it (e.g. llm.ts)
+    process.env["LLM_PROVIDER"] = env.LLM_PROVIDER;
+    process.env["LLM_MODEL"] = env.LLM_MODEL;
+    process.env["GOOGLE_GENERATIVE_AI_API_KEY"] = env.GOOGLE_GENERATIVE_AI_API_KEY;
 
     const url = new URL(request.url);
 
