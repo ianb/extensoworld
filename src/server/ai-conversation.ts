@@ -5,7 +5,7 @@ import type { ConversationState, WordEntry } from "../core/conversation.js";
 import type { GamePrompts } from "../core/game-data.js";
 import { getLlm, getLlmProviderOptions } from "./llm.js";
 import { composeConversationPrompt } from "./ai-prompts.js";
-import { saveWordEntry } from "./conversation-store.js";
+import { getStorage } from "./storage-instance.js";
 
 /** Max word entries before a conversation auto-closes to AI expansion */
 export const MAX_CONVERSATION_WORDS = 30;
@@ -175,7 +175,7 @@ export async function handleAiConversationFallback(
   };
 
   // Persist the new word entry
-  saveWordEntry({
+  await getStorage().saveWordEntry({
     ...entry,
     createdAt: new Date().toISOString(),
     gameId,

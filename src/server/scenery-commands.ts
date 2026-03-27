@@ -8,7 +8,7 @@ import {
   getCachedScenery,
   generateSceneryDescription,
 } from "./ai-scenery.js";
-import { saveAiEntity } from "./ai-entity-store.js";
+import { getStorage } from "./storage-instance.js";
 
 interface SceneryResponse {
   output: string;
@@ -55,7 +55,7 @@ export async function handleSceneryCheck(
   });
 
   // Persist scenery as permanent world-building (survives /reset)
-  saveAiEntity({
+  await getStorage().saveAiEntity({
     createdAt: new Date().toISOString(),
     gameId,
     id: room.id,

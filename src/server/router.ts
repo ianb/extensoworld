@@ -2,9 +2,9 @@ import { z } from "zod";
 import { router, publicProcedure } from "./trpc.js";
 import { describeRoomFull } from "../core/index.js";
 import type { EntityStore } from "../core/index.js";
-import { loadAiHandlers } from "./ai-handler-store.js";
-import { loadAiEntities } from "./ai-entity-store.js";
-import { replayEventLog } from "./event-log.js";
+import { recordToHandler } from "./ai-handler-store.js";
+import { applyEvents } from "./event-log.js";
+import { getStorage } from "./storage-instance.js";
 import { composeVerbPrompt, composeCreatePrompt } from "./ai-prompts.js";
 import type { GameInstance } from "../games/registry.js";
 import { getGame, listGames, isValidGameId } from "../games/registry.js";
@@ -24,29 +24,60 @@ class GameNotFoundError extends Error {
   }
 }
 
+/** Apply AI entity records to the store (create or update) */
+function applyAiEntities(
+  records: Array<{ id: string; tags: string[]; properties: Record<string, unknown> }>,
+  store: EntityStore,
+): void {
+  for (const record of records) {
+    if (store.has(record.id)) {
+      for (const [key, value] of Object.entries(record.properties)) {
+        if (value === null) {
+          store.removeProperty(record.id, key);
+        } else {
+          store.setProperty(record.id, { name: key, value });
+        }
+      }
+    } else {
+      store.create(record.id, {
+        tags: record.tags,
+        properties: record.properties,
+      });
+    }
+  }
+}
+
 /** Create a fresh game instance, load AI entities, replay event log, load AI handlers */
-function initGame(slug: string): GameInstance {
+async function initGame(slug: string): Promise<GameInstance> {
   const def = getGame(slug);
   if (!def) throw new GameNotFoundError(slug);
   const instance = def.create();
-  loadAiEntities(slug, instance.store);
+  const storage = getStorage();
+  const aiEntities = await storage.loadAiEntities(slug);
+  applyAiEntities(aiEntities, instance.store);
   instance.store.snapshot();
-  replayEventLog(slug, instance.store);
-  loadAiHandlers(slug, instance.verbs);
+  const events = await storage.loadEvents(slug);
+  for (const entry of events) {
+    applyEvents(instance.store, entry.events);
+  }
+  const handlerRecords = await storage.loadAiHandlers(slug);
+  for (const record of handlerRecords) {
+    instance.verbs.register(recordToHandler(record));
+  }
   return instance;
 }
 
-function getOrCreateGame(slug: string): GameInstance {
+async function getOrCreateGame(slug: string): Promise<GameInstance> {
   const existing = activeGames.get(slug);
   if (existing) return existing;
-  const instance = initGame(slug);
+  const instance = await initGame(slug);
   activeGames.set(slug, instance);
   return instance;
 }
 
 /** Reinitialize a game and update the active games map */
-function reinitGame(slug: string): GameInstance {
-  const instance = initGame(slug);
+async function reinitGame(slug: string): Promise<GameInstance> {
+  const instance = await initGame(slug);
   activeGames.set(slug, instance);
   return instance;
 }
@@ -72,15 +103,15 @@ export const appRouter = router({
     }));
   }),
 
-  look: publicProcedure.input(gameInput).query(({ input }) => {
-    const game = getOrCreateGame(input.gameId);
+  look: publicProcedure.input(gameInput).query(async ({ input }) => {
+    const game = await getOrCreateGame(input.gameId);
     return { output: describeCurrentRoom(game.store) };
   }),
 
   command: publicProcedure
     .input(z.object({ gameId: validGameId, text: z.string(), debug: z.boolean().optional() }))
     .mutation(async ({ input }) => {
-      const game = getOrCreateGame(input.gameId);
+      const game = await getOrCreateGame(input.gameId);
       try {
         return await executeCommand(input, { game, reinitGame });
       } catch (err: unknown) {
@@ -90,13 +121,13 @@ export const appRouter = router({
       }
     }),
 
-  reset: publicProcedure.input(gameInput).mutation(({ input }) => {
-    const instance = reinitGame(input.gameId);
+  reset: publicProcedure.input(gameInput).mutation(async ({ input }) => {
+    const instance = await reinitGame(input.gameId);
     return { output: describeCurrentRoom(instance.store) };
   }),
 
-  entities: publicProcedure.input(gameInput).query(({ input }) => {
-    const game = getOrCreateGame(input.gameId);
+  entities: publicProcedure.input(gameInput).query(async ({ input }) => {
+    const game = await getOrCreateGame(input.gameId);
     const ids = game.store.getAllIds();
     const players = game.store.findByTag("player");
     const playerRoomId = players[0] ? (players[0].properties["location"] as string) || null : null;
@@ -118,16 +149,16 @@ export const appRouter = router({
 
   entity: publicProcedure
     .input(z.object({ gameId: validGameId, id: z.string() }))
-    .query(({ input }) => {
-      const game = getOrCreateGame(input.gameId);
+    .query(async ({ input }) => {
+      const game = await getOrCreateGame(input.gameId);
       if (!game.store.has(input.id)) return null;
       const current = game.store.getSnapshot(input.id);
       const initial = game.store.getInitialState(input.id);
       return { current, initial };
     }),
 
-  prompts: publicProcedure.input(gameInput).query(({ input }) => {
-    const game = getOrCreateGame(input.gameId);
+  prompts: publicProcedure.input(gameInput).query(async ({ input }) => {
+    const game = await getOrCreateGame(input.gameId);
     const players = game.store.findByTag("player");
     const player = players[0];
     if (!player)

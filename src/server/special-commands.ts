@@ -1,7 +1,7 @@
 import type { EntityStore } from "../core/index.js";
 import { describeRoomFull } from "../core/index.js";
 import type { GameInstance } from "../games/registry.js";
-import { clearEventLog, popEventLog } from "./event-log.js";
+import { getStorage } from "./storage-instance.js";
 import { isRoomLit, darknessDescription } from "../core/darkness.js";
 import {
   handleAiCreateExitCommand,
@@ -43,20 +43,26 @@ export function handleSpecialCommand(
     game: GameInstance;
     gameId: string;
     opts: CommandOpts;
-    reinitGame?: (slug: string) => GameInstance;
+    reinitGame?: (slug: string) => Promise<GameInstance>;
   },
 ): CommandReturn | null {
   if (trimmed === "/undo" && reinitGame) {
-    const popped = popEventLog(gameId);
-    if (!popped) return { output: "Nothing to undo.", debug: undefined };
-    const rebuilt = reinitGame(gameId);
-    return { output: "[Undone]\n\n" + describeCurrentRoom(rebuilt.store), debug: undefined };
+    const doUndo = async () => {
+      const popped = await getStorage().popEvent(gameId);
+      if (!popped) return { output: "Nothing to undo.", debug: undefined };
+      const rebuilt = await reinitGame(gameId);
+      return { output: "[Undone]\n\n" + describeCurrentRoom(rebuilt.store), debug: undefined };
+    };
+    return doUndo();
   }
 
   if (trimmed === "/reset" && reinitGame) {
-    clearEventLog(gameId);
-    const rebuilt = reinitGame(gameId);
-    return { output: "[Reset]\n\n" + describeCurrentRoom(rebuilt.store), debug: undefined };
+    const doReset = async () => {
+      await getStorage().clearEvents(gameId);
+      const rebuilt = await reinitGame(gameId);
+      return { output: "[Reset]\n\n" + describeCurrentRoom(rebuilt.store), debug: undefined };
+    };
+    return doReset();
   }
 
   if (trimmed === "help ai") {

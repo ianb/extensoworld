@@ -5,7 +5,7 @@ import type { GamePrompts } from "../core/game-data.js";
 import { getLlm, getLlmProviderOptions } from "./llm.js";
 import { describeProperties, collectTags, buildPropertiesSchema } from "./ai-prompt-helpers.js";
 import { composeCreatePrompt } from "./ai-prompts.js";
-import { saveAiEntity } from "./ai-entity-store.js";
+import { getStorage } from "./storage-instance.js";
 import { removeMatchingScenery } from "./ai-scenery.js";
 
 export interface AiCreateResult {
@@ -194,7 +194,7 @@ export async function handleAiCreate(
   });
 
   // Persist
-  saveAiEntity({
+  await getStorage().saveAiEntity({
     createdAt: new Date().toISOString(),
     gameId,
     id: entityId,

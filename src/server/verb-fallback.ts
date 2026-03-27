@@ -4,8 +4,9 @@ import type { EntityStore, Entity } from "../core/entity.js";
 import type { ResolvedCommand, VerbHandler, WorldEvent } from "../core/verb-types.js";
 import type { VerbRegistry } from "../core/verbs.js";
 import { getLlm, getLlmProviderOptions } from "./llm.js";
-import type { AiHandlerRecord } from "./ai-handler-store.js";
-import { saveHandlerRecord, recordToHandler } from "./ai-handler-store.js";
+import type { AiHandlerRecord } from "./storage.js";
+import { recordToHandler } from "./ai-handler-store.js";
+import { getStorage } from "./storage-instance.js";
 import { describeProperties, collectTags } from "./ai-prompt-helpers.js";
 import type { HandlerLib } from "../core/handler-lib.js";
 import type { GamePrompts } from "../core/game-data.js";
@@ -230,7 +231,7 @@ export async function handleVerbFallback(
     perform: buildPerformCode(response),
   };
 
-  saveHandlerRecord(record);
+  await getStorage().saveHandler(record);
   const handler = recordToHandler(record);
   verbs.register(handler);
 

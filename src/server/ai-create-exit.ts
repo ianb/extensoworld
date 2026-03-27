@@ -5,7 +5,7 @@ import type { GamePrompts } from "../core/game-data.js";
 import { getLlm, getLlmProviderOptions } from "./llm.js";
 import { describeProperties, collectTags, buildPropertiesSchema } from "./ai-prompt-helpers.js";
 import { composeCreatePrompt } from "./ai-prompts.js";
-import { saveAiEntity } from "./ai-entity-store.js";
+import { getStorage } from "./storage-instance.js";
 
 export interface AiCreateExitResult {
   output: string;
@@ -196,7 +196,7 @@ export async function handleAiCreateExit(
 
   store.create(entityId, { tags: ["exit"], properties });
 
-  saveAiEntity({
+  await getStorage().saveAiEntity({
     createdAt: new Date().toISOString(),
     gameId,
     id: entityId,

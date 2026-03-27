@@ -4,7 +4,8 @@ import type { DebugInfo } from "../core/world.js";
 import type { UnresolvedExitContext } from "../core/movement.js";
 import type { VerbRegistry, ResolvedCommand } from "../core/verbs.js";
 import type { WorldEvent } from "../core/verb-types.js";
-import { appendEventLog } from "./event-log.js";
+import { getStorage } from "./storage-instance.js";
+import type { EventLogEntry } from "./storage.js";
 import type { HandlerLib } from "../core/handler-lib.js";
 import { describeRoomFull } from "../core/describe.js";
 import { isRoomLit, darknessDescription } from "../core/darkness.js";
@@ -12,8 +13,6 @@ import { handleAiCreate } from "./ai-create.js";
 import { handleAiCreateExit } from "./ai-create-exit.js";
 import { handleAiCreateRoom } from "./ai-create-room.js";
 import { handleVerbFallback } from "./verb-fallback.js";
-import { getAiEntityIds, removeAiEntity } from "./ai-entity-store.js";
-import { listAiHandlerRecords, removeAiHandler } from "./ai-handler-store.js";
 
 interface CommandResponse {
   output: string;
@@ -109,11 +108,12 @@ export async function handleAiCreateCommand(
   };
 }
 
-export function handleAiDestroyCommand(
+export async function handleAiDestroyCommand(
   store: EntityStore,
   { objectName, gameId }: { objectName: string; gameId: string },
-): CommandResponse {
-  const aiIds = getAiEntityIds(gameId);
+): Promise<CommandResponse> {
+  const storage = getStorage();
+  const aiIds = await storage.getAiEntityIds(gameId);
   let match: string | null = null;
   for (const id of aiIds) {
     if (!store.has(id)) continue;
@@ -131,20 +131,19 @@ export function handleAiDestroyCommand(
   }
   if (!match) {
     // Check if there's a matching verb handler to suggest
-    const verbMatches = listAiHandlerRecords(gameId).filter((r) =>
-      r.name.toLowerCase().includes(objectName),
-    );
+    const handlerRecords = await storage.listHandlers(gameId);
+    const verbMatches = handlerRecords.filter((r) => r.name.toLowerCase().includes(objectName));
     const hint = verbMatches.length > 0 ? `\nDid you mean: ai destroy verb ${objectName}` : "";
     return { output: `No AI-created object matching "${objectName}" found.${hint}` };
   }
   const entity = store.get(match);
   const entityName = (entity.properties["name"] as string) || match;
   store.delete(match);
-  removeAiEntity(gameId, match);
+  await storage.removeAiEntity(gameId, match);
   return { output: `[Destroyed ${entityName} (${match})]` };
 }
 
-export function handleAiDestroyVerbCommand({
+export async function handleAiDestroyVerbCommand({
   search,
   confirm,
   gameId,
@@ -154,8 +153,9 @@ export function handleAiDestroyVerbCommand({
   confirm: boolean;
   gameId: string;
   verbs: VerbRegistry;
-}): CommandResponse {
-  const records = listAiHandlerRecords(gameId);
+}): Promise<CommandResponse> {
+  const storage = getStorage();
+  const records = await storage.listHandlers(gameId);
   const lower = search.toLowerCase();
   const matches = records.filter((r) => r.name.toLowerCase().includes(lower));
 
@@ -184,7 +184,7 @@ export function handleAiDestroyVerbCommand({
     return { output: `No AI verb handler with exact name "${search}" found.` };
   }
 
-  removeAiHandler(gameId, exact.name);
+  await storage.removeHandler(gameId, exact.name);
   verbs.removeByName(exact.name);
   return { output: `[Destroyed verb handler: ${exact.name}]` };
 }
@@ -221,11 +221,12 @@ export async function handleUnresolvedExit(
     description: `Moved ${context.direction}`,
   };
   // Only persist the player move — AI world-building is saved via saveAiEntity
-  appendEventLog(gameId, {
+  const entry: EventLogEntry = {
     command: `go ${context.direction}`,
     events: [moveEvent],
     timestamp: new Date().toISOString(),
-  });
+  };
+  await getStorage().appendEvent(gameId, entry);
 
   const roomDesc = describeCurrentRoom(store);
   return {

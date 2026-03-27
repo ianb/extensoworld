@@ -1,6 +1,7 @@
 import { processCommand } from "../core/index.js";
 import type { GameInstance } from "../games/registry.js";
-import { appendEventLog } from "./event-log.js";
+import { getStorage } from "./storage-instance.js";
+import type { EventLogEntry } from "./storage.js";
 import { handleUnresolvedExit, handleVerbFallbackCommand } from "./ai-commands.js";
 import { handleConversationWord, checkForConversationStart } from "./conversation-commands.js";
 import { handleSceneryCheck } from "./scenery-commands.js";
@@ -14,7 +15,7 @@ export interface CommandInput {
 
 export async function executeCommand(
   input: CommandInput,
-  { game, reinitGame }: { game: GameInstance; reinitGame: (slug: string) => GameInstance },
+  { game, reinitGame }: { game: GameInstance; reinitGame: (slug: string) => Promise<GameInstance> },
 ): Promise<{ output: string; debug?: unknown; conversationMode?: unknown; aiOutput?: string }> {
   const trimmed = input.text.trim();
   const opts = { gameId: input.gameId, prompts: game.prompts, debug: input.debug };
@@ -33,7 +34,7 @@ export async function executeCommand(
   }
 
   const special = handleSpecialCommand(trimmed, { game, gameId: input.gameId, opts, reinitGame });
-  if (special) return special;
+  if (special) return await special;
 
   // Extract [bracketed instructions] for AI guidance
   const bracketMatch = /\[([^\]]+)]/.exec(trimmed);
@@ -79,11 +80,12 @@ export async function executeCommand(
       aiInstructions,
     });
     if (fallback.events.length > 0) {
-      appendEventLog(input.gameId, {
+      const entry: EventLogEntry = {
         command: trimmed,
         events: fallback.events,
         timestamp: new Date().toISOString(),
-      });
+      };
+      await getStorage().appendEvent(input.gameId, entry);
     }
     return { output: fallback.output, aiOutput: fallback.aiOutput, debug: fallback.debug };
   }
@@ -91,15 +93,16 @@ export async function executeCommand(
   // Don't persist start-conversation events (ephemeral)
   const persistEvents = result.events.filter((e) => e.type !== "start-conversation");
   if (persistEvents.length > 0) {
-    appendEventLog(input.gameId, {
+    const entry: EventLogEntry = {
       command: trimmed,
       events: persistEvents,
       timestamp: new Date().toISOString(),
-    });
+    };
+    await getStorage().appendEvent(input.gameId, entry);
   }
 
   // Check if a start-conversation event was emitted
-  const convStart = checkForConversationStart(game, {
+  const convStart = await checkForConversationStart(game, {
     events: result.events,
     gameId: input.gameId,
   });

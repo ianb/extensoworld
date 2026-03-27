@@ -12,7 +12,7 @@ import {
   reverseDirection,
 } from "./ai-prompt-helpers.js";
 import { composeCreatePrompt } from "./ai-prompts.js";
-import { saveAiEntity } from "./ai-entity-store.js";
+import { getStorage } from "./storage-instance.js";
 
 export interface AiCreateRoomDebugInfo {
   systemPrompt: string;
@@ -157,17 +157,12 @@ function uniqueId(store: EntityStore, baseId: string): string {
   return `${baseId}-${n}`;
 }
 
-function createAndSave(
+async function createAndSave(
   store: EntityStore,
-  {
-    id,
-    tags,
-    properties,
-    gameId,
-  }: { id: string; tags: string[]; properties: Record<string, unknown>; gameId: string },
-): void {
-  store.create(id, { tags, properties });
-  saveAiEntity({ createdAt: new Date().toISOString(), gameId, id, tags, properties });
+  opts: { id: string; tags: string[]; properties: Record<string, unknown>; gameId: string },
+): Promise<void> {
+  store.create(opts.id, { tags: opts.tags, properties: opts.properties });
+  await getStorage().saveAiEntity({ createdAt: new Date().toISOString(), ...opts });
 }
 
 export async function handleAiCreateRoom(
@@ -210,7 +205,7 @@ export async function handleAiCreateRoom(
     description: roomData.description,
     ...roomData.properties,
   });
-  createAndSave(store, { id: roomId, tags: roomData.tags, properties: roomProps, gameId });
+  await createAndSave(store, { id: roomId, tags: roomData.tags, properties: roomProps, gameId });
 
   const events: WorldEvent[] = [];
   function setAndRecord(evt: {
@@ -254,7 +249,7 @@ export async function handleAiCreateRoom(
   }
 
   // Persist the modified exit so changes survive /reset
-  saveAiEntity({
+  await getStorage().saveAiEntity({
     createdAt: new Date().toISOString(),
     gameId,
     id: exit.id,
@@ -265,7 +260,7 @@ export async function handleAiCreateRoom(
   // Return exit
   const roomSlug = roomId.replace("room:", "");
   const returnDir = reverseDirection(direction);
-  createAndSave(store, {
+  await createAndSave(store, {
     id: `exit:${roomSlug}:${returnDir}`,
     tags: ["exit"],
     properties: {
@@ -291,7 +286,7 @@ export async function handleAiCreateRoom(
       ...ed.properties,
     });
     if (ed.aliases.length > 0) ep.aliases = ed.aliases;
-    createAndSave(store, { id: eid, tags: ["exit"], properties: ep, gameId });
+    await createAndSave(store, { id: eid, tags: ["exit"], properties: ep, gameId });
   }
 
   for (const item of roomData.contents) {
@@ -303,7 +298,7 @@ export async function handleAiCreateRoom(
       ...item.properties,
     });
     if (item.aliases.length > 0) ip.aliases = item.aliases;
-    createAndSave(store, { id: iid, tags: item.tags, properties: ip, gameId });
+    await createAndSave(store, { id: iid, tags: item.tags, properties: ip, gameId });
   }
 
   const debugInfo: AiCreateRoomDebugInfo | undefined = debug
