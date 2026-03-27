@@ -17,6 +17,7 @@
     "prepare": "husky",
     "test": "tap",
     "bundle-games": "tsx scripts/bundle-game-data.ts",
+    "pull-data": "tsx scripts/pull-d1-data.ts",
     "deploy": "npm run bundle-games && wrangler deploy",
     "deploy:preview": "npm run bundle-games && wrangler dev"
   },
