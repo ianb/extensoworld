@@ -180,7 +180,6 @@ export async function handleAiConversationFallback(
     ...entry,
     createdAt: new Date().toISOString(),
     gameId: session.gameId,
-    userId: session.userId,
     npcId: npc.id,
   });
 

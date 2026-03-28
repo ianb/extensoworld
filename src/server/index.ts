@@ -15,7 +15,12 @@ import "../games/colossal-cave/index.js";
 import "../games/the-aaru/index.js";
 
 // Configure file-based storage
-setStorage(new FileStorage(resolve(process.cwd(), "data")));
+setStorage(
+  new FileStorage({
+    dataDir: resolve(process.cwd(), "data"),
+    userDataDir: resolve(process.cwd(), "userdata"),
+  }),
+);
 
 const DEV_JWT_SECRET = "dev-secret-not-for-production";
 

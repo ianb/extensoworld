@@ -247,12 +247,12 @@ export class D1Storage implements RuntimeStorage {
 
   // --- Conversations (per-user) ---
 
-  async loadConversationEntries(session: SessionKey, npcId: string): Promise<WordEntryRecord[]> {
+  async loadConversationEntries(gameId: string, npcId: string): Promise<WordEntryRecord[]> {
     const result = await this.db
       .prepare(
-        "SELECT * FROM conversation_entries WHERE game_id = ? AND user_id = ? AND npc_id = ? ORDER BY created_at",
+        "SELECT * FROM conversation_entries WHERE game_id = ? AND npc_id = ? ORDER BY created_at",
       )
-      .bind(session.gameId, session.userId, npcId)
+      .bind(gameId, npcId)
       .all<ConversationRow>();
     return result.results.map((row) => {
       const entry = JSON.parse(row.entry) as WordEntryRecord;
@@ -260,7 +260,6 @@ export class D1Storage implements RuntimeStorage {
         ...entry,
         createdAt: row.created_at,
         gameId: row.game_id,
-        userId: row.user_id,
         npcId: row.npc_id,
       };
     });
@@ -274,7 +273,7 @@ export class D1Storage implements RuntimeStorage {
       )
       .bind(
         record.gameId,
-        record.userId,
+        "shared",
         record.npcId,
         record.word,
         JSON.stringify(record),

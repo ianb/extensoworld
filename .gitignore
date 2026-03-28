@@ -5,6 +5,6 @@ dist/
 .tap/
 .env
 client_secret_*.json
-data/
+userdata/
 generated/
 .wrangler/

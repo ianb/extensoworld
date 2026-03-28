@@ -25,7 +25,6 @@ export interface EventLogEntry {
 export interface WordEntryRecord extends WordEntry {
   createdAt: string;
   gameId: string;
-  userId: string;
   npcId: string;
 }
 
@@ -75,8 +74,8 @@ export interface RuntimeStorage {
   clearEvents(session: SessionKey): Promise<void>;
   popEvent(session: SessionKey): Promise<EventLogEntry | null>;
 
-  // --- Conversations (per-user) ---
-  loadConversationEntries(session: SessionKey, npcId: string): Promise<WordEntryRecord[]>;
+  // --- Conversations (shared world content) ---
+  loadConversationEntries(gameId: string, npcId: string): Promise<WordEntryRecord[]>;
   saveWordEntry(record: WordEntryRecord): Promise<void>;
 
   // --- Users ---

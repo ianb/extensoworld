@@ -146,10 +146,10 @@ function run(): void {
     `SELECT * FROM conversation_entries${gameFilter} ORDER BY game_id, npc_id, created_at`,
   );
 
-  // Group by game_id + user_id + npc_id
+  // Group by game_id + npc_id (conversations are shared, not per-user)
   const convByKey = new Map<string, ConversationRow[]>();
   for (const row of conversations) {
-    const key = `${row.game_id}/${row.user_id}/${row.npc_id}`;
+    const key = `${row.game_id}/${row.npc_id}`;
     const list = convByKey.get(key);
     if (list) {
       list.push(row);
@@ -158,13 +158,13 @@ function run(): void {
     }
   }
   for (const [key, rows] of convByKey) {
-    const [gameId, userId, npcId] = key.split("/");
+    const [gameId, npcId] = key.split("/");
     const safeNpcId = npcId!.replace(/:/g, "_");
     const records = rows.map((row) => {
       const entry = JSON.parse(row.entry);
-      return { ...entry, createdAt: row.created_at, gameId, userId, npcId };
+      return { ...entry, createdAt: row.created_at, gameId, npcId };
     });
-    writeJsonl(resolve(outDir, "npc", gameId!, userId!, `${safeNpcId}.jsonl`), records);
+    writeJsonl(resolve(outDir, "npc", gameId!, `${safeNpcId}.jsonl`), records);
   }
 
   const totalEntities = entities.length;

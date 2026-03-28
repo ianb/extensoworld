@@ -19,11 +19,11 @@ interface ConversationResponse {
 
 /** Load conversation data for an NPC, merging initial game data with stored entries */
 async function loadConversationData(
-  session: SessionKey,
+  gameId: string,
   { npcId, initial }: { npcId: string; initial: { words: WordEntry[]; closed?: boolean } | null },
 ): Promise<{ words: WordEntry[]; closed?: boolean }> {
   const words: WordEntry[] = initial ? [...initial.words] : [];
-  const stored = await getStorage().loadConversationEntries(session, npcId);
+  const stored = await getStorage().loadConversationEntries(gameId, npcId);
   words.push(...stored);
   return { words, closed: initial ? initial.closed : undefined };
 }
@@ -37,7 +37,7 @@ export async function handleTalkTo(
   const npcName = (npc.properties["name"] as string) || npc.id;
 
   const initial = (game.conversations && game.conversations[npcId]) || null;
-  const data = await loadConversationData(session, { npcId, initial });
+  const data = await loadConversationData(session.gameId, { npcId, initial });
 
   if (data.words.length === 0) {
     return {
@@ -102,7 +102,7 @@ export async function handleConversationWord(
   const npc = game.store.get(state.npcId);
   const npcName = (npc.properties["name"] as string) || npc.id;
   const initial = (game.conversations && game.conversations[state.npcId]) || null;
-  const data = await loadConversationData(session, { npcId: state.npcId, initial });
+  const data = await loadConversationData(session.gameId, { npcId: state.npcId, initial });
 
   let result: ConversationResult;
   try {

@@ -31,13 +31,19 @@ function appendJsonl(filePath: string, record: unknown): void {
 
 export class FileStorage implements RuntimeStorage {
   private dataDir: string;
+  private userDataDir: string;
 
-  constructor(dataDir: string) {
+  constructor({ dataDir, userDataDir }: { dataDir: string; userDataDir: string }) {
     this.dataDir = dataDir;
+    this.userDataDir = userDataDir;
   }
 
   private path(...segments: string[]): string {
     return resolve(this.dataDir, ...segments);
+  }
+
+  private userPath(...segments: string[]): string {
+    return resolve(this.userDataDir, ...segments);
   }
 
   // --- AI Entities ---
@@ -103,16 +109,16 @@ export class FileStorage implements RuntimeStorage {
 
   async loadEvents(session: SessionKey): Promise<EventLogEntry[]> {
     return readJsonl<EventLogEntry>(
-      this.path(`event-log-${session.gameId}-${session.userId}.jsonl`),
+      this.userPath(`event-log-${session.gameId}-${session.userId}.jsonl`),
     );
   }
 
   async appendEvent(session: SessionKey, entry: EventLogEntry): Promise<void> {
-    appendJsonl(this.path(`event-log-${session.gameId}-${session.userId}.jsonl`), entry);
+    appendJsonl(this.userPath(`event-log-${session.gameId}-${session.userId}.jsonl`), entry);
   }
 
   async clearEvents(session: SessionKey): Promise<void> {
-    const filePath = this.path(`event-log-${session.gameId}-${session.userId}.jsonl`);
+    const filePath = this.userPath(`event-log-${session.gameId}-${session.userId}.jsonl`);
     if (existsSync(filePath)) {
       writeFileSync(filePath, "");
     }
@@ -122,7 +128,7 @@ export class FileStorage implements RuntimeStorage {
     const entries = await this.loadEvents(session);
     if (entries.length === 0) return null;
     const popped = entries.pop()!;
-    const filePath = this.path(`event-log-${session.gameId}-${session.userId}.jsonl`);
+    const filePath = this.userPath(`event-log-${session.gameId}-${session.userId}.jsonl`);
     ensureDir(filePath);
     if (entries.length === 0) {
       writeFileSync(filePath, "");
@@ -134,46 +140,44 @@ export class FileStorage implements RuntimeStorage {
 
   // --- Conversations (per-user) ---
 
-  async loadConversationEntries(session: SessionKey, npcId: string): Promise<WordEntryRecord[]> {
+  async loadConversationEntries(gameId: string, npcId: string): Promise<WordEntryRecord[]> {
     const safeId = npcId.replace(/:/g, "_");
-    return readJsonl<WordEntryRecord>(
-      this.path("npc", session.gameId, session.userId, `${safeId}.jsonl`),
-    );
+    return readJsonl<WordEntryRecord>(this.path("npc", gameId, `${safeId}.jsonl`));
   }
 
   async saveWordEntry(record: WordEntryRecord): Promise<void> {
     const safeId = record.npcId.replace(/:/g, "_");
-    appendJsonl(this.path("npc", record.gameId, record.userId, `${safeId}.jsonl`), record);
+    appendJsonl(this.path("npc", record.gameId, `${safeId}.jsonl`), record);
   }
 
   // --- Users ---
 
   async findUserByGoogleId(googleId: string): Promise<UserRecord | null> {
-    const users = readJsonl<UserRecord>(this.path("users.jsonl"));
+    const users = readJsonl<UserRecord>(this.userPath("users.jsonl"));
     return users.find((u) => u.googleId === googleId) || null;
   }
 
   async findUserById(id: string): Promise<UserRecord | null> {
-    const users = readJsonl<UserRecord>(this.path("users.jsonl"));
+    const users = readJsonl<UserRecord>(this.userPath("users.jsonl"));
     return users.find((u) => u.id === id) || null;
   }
 
   async findUserByName(name: string): Promise<UserRecord | null> {
-    const users = readJsonl<UserRecord>(this.path("users.jsonl"));
+    const users = readJsonl<UserRecord>(this.userPath("users.jsonl"));
     return users.find((u) => u.displayName === name) || null;
   }
 
   async hasAnyUsers(): Promise<boolean> {
-    const users = readJsonl<UserRecord>(this.path("users.jsonl"));
+    const users = readJsonl<UserRecord>(this.userPath("users.jsonl"));
     return users.length > 0;
   }
 
   async createUser(record: UserRecord): Promise<void> {
-    appendJsonl(this.path("users.jsonl"), record);
+    appendJsonl(this.userPath("users.jsonl"), record);
   }
 
   async updateLastLogin(userId: string): Promise<void> {
-    const filePath = this.path("users.jsonl");
+    const filePath = this.userPath("users.jsonl");
     if (!existsSync(filePath)) return;
     const lines = readFileSync(filePath, "utf-8").trim().split("\n");
     const updated = lines.map((line) => {
