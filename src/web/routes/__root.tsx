@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { Outlet, Link, createRootRoute, useMatchRoute } from "@tanstack/react-router";
-import { AuthContext, fetchAuthStatus } from "../auth.js";
+import { AuthContext, fetchAuthStatus, logout } from "../auth.js";
 import type { AuthUser } from "../auth.js";
+import { trpc } from "../trpc.js";
 
 export const rootRoute = createRootRoute({
   component: RootLayout,
@@ -25,12 +26,82 @@ function RootLayout() {
   return (
     <AuthContext value={{ user, devMode, loading }}>
       <div className="flex min-h-screen flex-col bg-gray-950 text-gray-100">
-        <div className="flex-1">
+        <NavBar />
+        <div className="flex min-h-0 flex-1 flex-col">
           <Outlet />
         </div>
         {isGamePage ? null : <Footer />}
       </div>
     </AuthContext>
+  );
+}
+
+function NavBar() {
+  const auth = useContext(AuthContext);
+  const matchRoute = useMatchRoute();
+  const isGamePage = matchRoute({ to: "/game/$gameId", fuzzy: true });
+  const isHomePage = matchRoute({ to: "/" });
+
+  return (
+    <nav className="border-b border-gray-800 px-4 py-2">
+      <div className="mx-auto flex max-w-5xl items-center justify-between">
+        <div className="flex items-center gap-2 text-sm">
+          {isHomePage ? (
+            <span className="font-bold text-gray-100">Rooms Upon Rooms</span>
+          ) : (
+            <Link to="/" className="font-bold text-gray-400 hover:text-gray-200">
+              Rooms Upon Rooms
+            </Link>
+          )}
+          {isGamePage ? (
+            <GameBreadcrumb gameId={(isGamePage as { gameId: string }).gameId} />
+          ) : null}
+        </div>
+        <div className="flex items-center gap-3 text-sm">
+          {auth.loading ? null : auth.user ? (
+            <UserIndicator name={auth.user.displayName} />
+          ) : (
+            <Link to="/" className="text-gray-500 hover:text-gray-300">
+              Sign in
+            </Link>
+          )}
+        </div>
+      </div>
+    </nav>
+  );
+}
+
+function GameBreadcrumb({ gameId }: { gameId: string }) {
+  const [title, setTitle] = useState<string | null>(null);
+
+  useEffect(() => {
+    trpc.games.query().then((games) => {
+      const match = games.find((g: { slug: string }) => g.slug === gameId);
+      if (match) setTitle(match.title);
+    });
+  }, [gameId]);
+
+  return (
+    <>
+      <span className="text-gray-600">/</span>
+      <span className="text-gray-300">{title || gameId}</span>
+    </>
+  );
+}
+
+function UserIndicator({ name }: { name: string }) {
+  async function handleLogout(): Promise<void> {
+    await logout();
+    window.location.reload();
+  }
+
+  return (
+    <>
+      <span className="text-gray-400">{name}</span>
+      <button onClick={handleLogout} className="text-gray-600 hover:text-gray-300">
+        Sign out
+      </button>
+    </>
   );
 }
 

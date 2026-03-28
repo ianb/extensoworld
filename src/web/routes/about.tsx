@@ -1,4 +1,4 @@
-import { createRoute, Link } from "@tanstack/react-router";
+import { createRoute } from "@tanstack/react-router";
 import { rootRoute } from "./__root.js";
 
 export const aboutRoute = createRoute({
@@ -10,10 +10,6 @@ export const aboutRoute = createRoute({
 function AboutPage() {
   return (
     <div className="mx-auto max-w-2xl p-8">
-      <Link to="/" className="mb-6 inline-block text-sm text-gray-500 hover:text-gray-300">
-        &larr; Back
-      </Link>
-
       <h1 className="mb-6 text-2xl font-bold">About Rooms Upon Rooms</h1>
 
       <div className="space-y-4 text-gray-300">

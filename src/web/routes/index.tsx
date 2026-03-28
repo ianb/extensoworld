@@ -2,7 +2,7 @@ import { useState, useEffect, useContext } from "react";
 import { createRoute, Link } from "@tanstack/react-router";
 import { rootRoute } from "./__root.js";
 import { trpc } from "../trpc.js";
-import { AuthContext, devLogin, logout } from "../auth.js";
+import { AuthContext, devLogin } from "../auth.js";
 
 export const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -26,11 +26,6 @@ function HomePage() {
 
   return (
     <div className="mx-auto max-w-2xl p-8">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Rooms Upon Rooms</h1>
-        {auth.loading ? null : auth.user ? <UserBadge name={auth.user.displayName} /> : null}
-      </div>
-
       {!auth.loading && !auth.user ? <LoginSection devMode={auth.devMode} /> : null}
 
       <p className="mb-6 text-gray-400">Choose an adventure:</p>
@@ -102,22 +97,6 @@ function LoginSection({ devMode }: { devMode: boolean }) {
       >
         Sign in with Google
       </a>
-    </div>
-  );
-}
-
-function UserBadge({ name }: { name: string }) {
-  async function handleLogout(): Promise<void> {
-    await logout();
-    window.location.reload();
-  }
-
-  return (
-    <div className="flex items-center gap-3 text-sm text-gray-400">
-      <span>{name}</span>
-      <button onClick={handleLogout} className="text-gray-500 hover:text-gray-300">
-        Sign out
-      </button>
     </div>
   );
 }
