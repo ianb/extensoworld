@@ -109,9 +109,17 @@ function Footer() {
   return (
     <footer className="border-t border-gray-800 px-4 py-3">
       <div className="mx-auto flex max-w-2xl items-center justify-between text-xs text-gray-500">
-        <Link to="/about" className="hover:text-gray-300">
-          About
-        </Link>
+        <div className="flex gap-4">
+          <Link to="/about" className="hover:text-gray-300">
+            About
+          </Link>
+          <Link to="/privacy" className="hover:text-gray-300">
+            Privacy
+          </Link>
+          <Link to="/tos" className="hover:text-gray-300">
+            Terms
+          </Link>
+        </div>
         <a
           href="https://github.com/ianb/roomsuponrooms"
           className="hover:text-gray-300"
