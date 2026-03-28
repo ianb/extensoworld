@@ -62,6 +62,9 @@ interface EntityRow {
   tags: string;
   properties: string;
   created_at: string;
+  created_by: string | null;
+  creation_source: string | null;
+  creation_command: string | null;
 }
 
 interface HandlerRow {
@@ -69,6 +72,9 @@ interface HandlerRow {
   name: string;
   data: string;
   created_at: string;
+  created_by: string | null;
+  creation_source: string | null;
+  creation_command: string | null;
 }
 
 interface ConversationRow {
@@ -78,6 +84,9 @@ interface ConversationRow {
   word: string;
   entry: string;
   created_at: string;
+  created_by: string | null;
+  creation_source: string | null;
+  creation_command: string | null;
 }
 
 function ensureDir(filePath: string): void {
@@ -111,13 +120,23 @@ function run(): void {
     }
   }
   for (const [gameId, rows] of entitiesByGame) {
-    const records = rows.map((row) => ({
-      id: row.id,
-      tags: JSON.parse(row.tags),
-      properties: JSON.parse(row.properties),
-      createdAt: row.created_at,
-      gameId: row.game_id,
-    }));
+    const records = rows.map((row) => {
+      const rec: Record<string, unknown> = {
+        id: row.id,
+        tags: JSON.parse(row.tags),
+        properties: JSON.parse(row.properties),
+        createdAt: row.created_at,
+        gameId: row.game_id,
+      };
+      if (row.created_by) {
+        rec.authoring = {
+          createdBy: row.created_by,
+          creationSource: row.creation_source,
+          creationCommand: row.creation_command || undefined,
+        };
+      }
+      return rec;
+    });
     writeJsonl(resolve(outDir, `ai-entities-${gameId}.jsonl`), records);
   }
 
@@ -136,7 +155,15 @@ function run(): void {
   for (const [gameId, rows] of handlersByGame) {
     const records = rows.map((row) => {
       const data = JSON.parse(row.data);
-      return { ...data, createdAt: row.created_at, gameId: row.game_id };
+      const rec = { ...data, createdAt: row.created_at, gameId: row.game_id };
+      if (row.created_by) {
+        rec.authoring = {
+          createdBy: row.created_by,
+          creationSource: row.creation_source,
+          creationCommand: row.creation_command || undefined,
+        };
+      }
+      return rec;
     });
     writeJsonl(resolve(outDir, `ai-handlers-${gameId}.jsonl`), records);
   }
@@ -162,7 +189,15 @@ function run(): void {
     const safeNpcId = npcId!.replace(/:/g, "_");
     const records = rows.map((row) => {
       const entry = JSON.parse(row.entry);
-      return { ...entry, createdAt: row.created_at, gameId, npcId };
+      const rec = { ...entry, createdAt: row.created_at, gameId, npcId };
+      if (row.created_by) {
+        rec.authoring = {
+          createdBy: row.created_by,
+          creationSource: row.creation_source,
+          creationCommand: row.creation_command || undefined,
+        };
+      }
+      return rec;
     });
     writeJsonl(resolve(outDir, "npc", gameId!, `${safeNpcId}.jsonl`), records);
   }

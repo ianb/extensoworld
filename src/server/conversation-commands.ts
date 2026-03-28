@@ -8,7 +8,7 @@ import {
 import type { ConversationResult, WordEntry } from "../core/conversation.js";
 import { evaluateWordPerform, applyConversationEffects } from "../core/conversation-eval.js";
 import { getStorage } from "./storage-instance.js";
-import type { EventLogEntry, SessionKey } from "./storage.js";
+import type { AuthoringInfo, EventLogEntry, SessionKey } from "./storage.js";
 import { handleAiConversationFallback, MAX_CONVERSATION_WORDS } from "./ai-conversation.js";
 
 interface ConversationResponse {
@@ -92,7 +92,7 @@ export async function checkForConversationStart(
 /** Handle a single word during an active conversation */
 export async function handleConversationWord(
   game: GameInstance,
-  { word, session }: { word: string; session: SessionKey },
+  { word, session, authoring }: { word: string; session: SessionKey; authoring?: AuthoringInfo },
 ): Promise<ConversationResponse> {
   const state = game.conversationState;
   if (!state) {
@@ -114,6 +114,7 @@ export async function handleConversationWord(
         npcName,
         session,
         data,
+        authoring,
       });
     }
     throw err as Error;
@@ -159,11 +160,13 @@ async function handleUnknownWord(
     npcName,
     session,
     data,
+    authoring,
   }: {
     word: string;
     npcName: string;
     session: SessionKey;
     data: { words: WordEntry[]; closed?: boolean };
+    authoring?: AuthoringInfo;
   },
 ): Promise<ConversationResponse> {
   const state = game.conversationState!;
@@ -206,6 +209,7 @@ async function handleUnknownWord(
     existingWords: data.words,
     session,
     prompts: game.prompts,
+    authoring,
   });
 
   if (!aiResult.entry) {

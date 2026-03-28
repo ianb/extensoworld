@@ -5,7 +5,7 @@ import type { UnresolvedExitContext } from "../core/movement.js";
 import type { VerbRegistry, ResolvedCommand } from "../core/verbs.js";
 import type { WorldEvent } from "../core/verb-types.js";
 import { getStorage } from "./storage-instance.js";
-import type { EventLogEntry, SessionKey } from "./storage.js";
+import type { AuthoringInfo, EventLogEntry, SessionKey } from "./storage.js";
 import type { HandlerLib } from "../core/handler-lib.js";
 import { describeRoomFull } from "../core/describe.js";
 import { isRoomLit, darknessDescription } from "../core/darkness.js";
@@ -13,6 +13,8 @@ import { handleAiCreate } from "./ai-create.js";
 import { handleAiCreateExit } from "./ai-create-exit.js";
 import { handleAiCreateRoom } from "./ai-create-room.js";
 import { handleVerbFallback } from "./verb-fallback.js";
+
+export { handleAiDestroyCommand, handleAiDestroyVerbCommand } from "./ai-destroy.js";
 
 interface CommandResponse {
   output: string;
@@ -39,7 +41,14 @@ export async function handleAiCreateExitCommand(
     gameId,
     prompts,
     debug,
-  }: { instructions: string; gameId: string; prompts?: GamePrompts; debug?: boolean },
+    authoring,
+  }: {
+    instructions: string;
+    gameId: string;
+    prompts?: GamePrompts;
+    debug?: boolean;
+    authoring?: AuthoringInfo;
+  },
 ): Promise<CommandResponse> {
   const players = store.findByTag("player");
   const player = players[0];
@@ -52,6 +61,7 @@ export async function handleAiCreateExitCommand(
     gameId,
     prompts,
     debug,
+    authoring,
   });
   const roomDesc = describeCurrentRoom(store);
   return {
@@ -80,14 +90,28 @@ export async function handleAiCreateCommand(
     gameId,
     prompts,
     debug,
-  }: { description: string; gameId: string; prompts?: GamePrompts; debug?: boolean },
+    authoring,
+  }: {
+    description: string;
+    gameId: string;
+    prompts?: GamePrompts;
+    debug?: boolean;
+    authoring?: AuthoringInfo;
+  },
 ): Promise<CommandResponse> {
   const players = store.findByTag("player");
   const player = players[0];
   if (!player) return { output: "No player found." };
   const roomId = player.properties["location"] as string;
   const room = store.get(roomId);
-  const result = await handleAiCreate(store, { description, room, gameId, prompts, debug });
+  const result = await handleAiCreate(store, {
+    description,
+    room,
+    gameId,
+    prompts,
+    debug,
+    authoring,
+  });
   const roomDesc = describeCurrentRoom(store);
   return {
     output: roomDesc,
@@ -108,87 +132,6 @@ export async function handleAiCreateCommand(
   };
 }
 
-export async function handleAiDestroyCommand(
-  store: EntityStore,
-  { objectName, gameId }: { objectName: string; gameId: string },
-): Promise<CommandResponse> {
-  const storage = getStorage();
-  const aiIds = await storage.getAiEntityIds(gameId);
-  let match: string | null = null;
-  for (const id of aiIds) {
-    if (!store.has(id)) continue;
-    const entity = store.get(id);
-    const name = ((entity.properties["name"] as string) || "").toLowerCase();
-    const aliases = (entity.properties["aliases"] as string[]) || [];
-    if (
-      name === objectName ||
-      id === objectName ||
-      aliases.some((a) => a.toLowerCase() === objectName)
-    ) {
-      match = id;
-      break;
-    }
-  }
-  if (!match) {
-    // Check if there's a matching verb handler to suggest
-    const handlerRecords = await storage.listHandlers(gameId);
-    const verbMatches = handlerRecords.filter((r) => r.name.toLowerCase().includes(objectName));
-    const hint = verbMatches.length > 0 ? `\nDid you mean: ai destroy verb ${objectName}` : "";
-    return { output: `No AI-created object matching "${objectName}" found.${hint}` };
-  }
-  const entity = store.get(match);
-  const entityName = (entity.properties["name"] as string) || match;
-  store.delete(match);
-  await storage.removeAiEntity(gameId, match);
-  return { output: `[Destroyed ${entityName} (${match})]` };
-}
-
-export async function handleAiDestroyVerbCommand({
-  search,
-  confirm,
-  gameId,
-  verbs,
-}: {
-  search: string;
-  confirm: boolean;
-  gameId: string;
-  verbs: VerbRegistry;
-}): Promise<CommandResponse> {
-  const storage = getStorage();
-  const records = await storage.listHandlers(gameId);
-  const lower = search.toLowerCase();
-  const matches = records.filter((r) => r.name.toLowerCase().includes(lower));
-
-  if (matches.length === 0) {
-    return { output: `No AI verb handlers matching "${search}" found.` };
-  }
-
-  if (!confirm) {
-    const lines = matches.map((r) => {
-      const verb = r.pattern.verb;
-      const form = r.pattern.form;
-      const target = r.entityId || r.tag || "";
-      const confirmCmd = `ai destroy verb confirm ${r.name}`;
-      const header = `${r.name}  (${verb} ${form}${target ? " " + target : ""}) ((${confirmCmd}|delete))`;
-      const code = r.perform.length > 200 ? r.perform.slice(0, 200) + "..." : r.perform;
-      return `  ${header}\n    ${code}`;
-    });
-    return {
-      output: `Found ${matches.length} AI verb handler(s):\n${lines.join("\n")}`,
-    };
-  }
-
-  // Confirm mode — exact match required
-  const exact = records.find((r) => r.name === search);
-  if (!exact) {
-    return { output: `No AI verb handler with exact name "${search}" found.` };
-  }
-
-  await storage.removeHandler(gameId, exact.name);
-  verbs.removeByName(exact.name);
-  return { output: `[Destroyed verb handler: ${exact.name}]` };
-}
-
 export async function handleUnresolvedExit(
   store: EntityStore,
   {
@@ -196,11 +139,13 @@ export async function handleUnresolvedExit(
     session,
     prompts,
     debug,
+    authoring,
   }: {
     context: UnresolvedExitContext;
     session: SessionKey;
     prompts?: GamePrompts;
     debug?: boolean;
+    authoring?: AuthoringInfo;
   },
 ): Promise<CommandResponse> {
   const result = await handleAiCreateRoom(store, {
@@ -209,6 +154,7 @@ export async function handleUnresolvedExit(
     gameId: session.gameId,
     prompts,
     debug,
+    authoring,
   });
 
   // Move the player to the new room (session event — cleared on reset)
@@ -272,6 +218,7 @@ export async function handleVerbFallbackCommand(
     debug,
     existingDebug,
     aiInstructions,
+    authoring,
   }: {
     unhandled: UnhandledInput;
     gameId: string;
@@ -281,6 +228,7 @@ export async function handleVerbFallbackCommand(
     debug?: boolean;
     existingDebug?: DebugInfo;
     aiInstructions?: string;
+    authoring?: AuthoringInfo;
   },
 ): Promise<FallbackResponse> {
   const fallback = await handleVerbFallback(store, {
@@ -293,6 +241,7 @@ export async function handleVerbFallbackCommand(
     prompts,
     debug,
     aiInstructions,
+    authoring,
   });
   return {
     output: fallback.output,

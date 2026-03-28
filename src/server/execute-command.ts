@@ -1,7 +1,7 @@
 import { processCommand } from "../core/index.js";
 import type { GameInstance } from "../games/registry.js";
 import { getStorage } from "./storage-instance.js";
-import type { EventLogEntry, SessionKey } from "./storage.js";
+import type { AuthoringInfo, EventLogEntry, SessionKey } from "./storage.js";
 import { handleUnresolvedExit, handleVerbFallbackCommand } from "./ai-commands.js";
 import { handleConversationWord, checkForConversationStart } from "./conversation-commands.js";
 import { handleSceneryCheck } from "./scenery-commands.js";
@@ -35,19 +35,27 @@ export async function executeCommand(
   const trimmed = input.text.trim();
   const session: SessionKey = { gameId: input.gameId, userId: input.userId };
   const hasAiRole = !input.roles || input.roles.includes("ai");
+  const authoring: AuthoringInfo = {
+    createdBy: input.userId,
+    creationSource: "unknown",
+    creationCommand: trimmed,
+  };
   const opts = {
     gameId: input.gameId,
     session,
     prompts: game.prompts,
     debug: input.debug,
     hasAiRole,
+    authoring,
   };
 
   // Conversation mode: route single-word input to conversation engine
   if (game.conversationState) {
+    const convAuthoring = { ...authoring, creationSource: "conversation" };
     const convResult = await handleConversationWord(game, {
       word: trimmed,
       session,
+      authoring: convAuthoring,
     });
     return {
       output: convResult.output,
@@ -76,19 +84,26 @@ export async function executeCommand(
   if (result.unresolvedExit) {
     if (!hasAiRole) return { output: result.output || "You can't go that way." };
     if (onAiStart) onAiStart();
-    return handleUnresolvedExit(game.store, { context: result.unresolvedExit, ...opts });
+    const exitAuthoring = { ...authoring, creationSource: "unresolved-exit" };
+    return handleUnresolvedExit(game.store, {
+      context: result.unresolvedExit,
+      ...opts,
+      authoring: exitAuthoring,
+    });
   }
 
   // Check for scenery — words in the room description that can be examined
   if (result.unresolvedObject) {
     if (!hasAiRole) return { output: result.output || "You don't see that here." };
     if (onAiStart) onAiStart();
+    const sceneryAuthoring = { ...authoring, creationSource: "scenery" };
     const sceneryResult = await handleSceneryCheck(game, {
       verb: result.unresolvedObject.verb,
       objectName: result.unresolvedObject.objectName,
       gameId: input.gameId,
       prompts: game.prompts,
       debug: input.debug,
+      authoring: sceneryAuthoring,
     });
     if (sceneryResult) {
       return { output: sceneryResult.output, debug: sceneryResult.debug || result.debug };
@@ -98,6 +113,7 @@ export async function executeCommand(
   if (result.unhandled) {
     if (!hasAiRole) return { output: result.output || "I don't understand that." };
     if (onAiStart) onAiStart();
+    const verbAuthoring = { ...authoring, creationSource: "verb-fallback" };
     const fallback = await handleVerbFallbackCommand(game.store, {
       unhandled: result.unhandled,
       gameId: input.gameId,
@@ -107,6 +123,7 @@ export async function executeCommand(
       debug: input.debug,
       existingDebug: result.debug,
       aiInstructions,
+      authoring: verbAuthoring,
     });
     if (fallback.events.length > 0) {
       const entry: EventLogEntry = {

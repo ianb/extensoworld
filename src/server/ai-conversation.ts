@@ -6,7 +6,7 @@ import type { GamePrompts } from "../core/game-data.js";
 import { getLlm, getLlmProviderOptions } from "./llm.js";
 import { composeConversationPrompt } from "./ai-prompts.js";
 import { getStorage } from "./storage-instance.js";
-import type { SessionKey } from "./storage.js";
+import type { AuthoringInfo, SessionKey } from "./storage.js";
 
 /** Max word entries before a conversation auto-closes to AI expansion */
 export const MAX_CONVERSATION_WORDS = 30;
@@ -136,6 +136,7 @@ export async function handleAiConversationFallback(
     existingWords,
     session,
     prompts,
+    authoring,
   }: {
     word: string;
     npc: Entity;
@@ -144,6 +145,7 @@ export async function handleAiConversationFallback(
     existingWords: WordEntry[];
     session: SessionKey;
     prompts?: GamePrompts;
+    authoring?: AuthoringInfo;
   },
 ): Promise<AiConversationResult> {
   const systemPrompt = buildSystemPrompt({ npc, room, store, prompts });
@@ -181,6 +183,7 @@ export async function handleAiConversationFallback(
     createdAt: new Date().toISOString(),
     gameId: session.gameId,
     npcId: npc.id,
+    authoring,
   });
 
   return { entry, rejectionType: "no-response", durationMs };

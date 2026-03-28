@@ -2,7 +2,7 @@ import type { EntityStore } from "../core/index.js";
 import { describeRoomFull } from "../core/index.js";
 import type { GameInstance } from "../games/registry.js";
 import { getStorage } from "./storage-instance.js";
-import type { SessionKey } from "./storage.js";
+import type { AuthoringInfo, SessionKey } from "./storage.js";
 import { isRoomLit, darknessDescription } from "../core/darkness.js";
 import {
   handleAiCreateExitCommand,
@@ -16,6 +16,7 @@ interface CommandOpts {
   prompts?: GameInstance["prompts"];
   debug?: boolean;
   hasAiRole?: boolean;
+  authoring?: AuthoringInfo;
 }
 
 type CommandReturn =
@@ -91,13 +92,15 @@ export function handleSpecialCommand(
   if (trimmed.startsWith("ai create exit ")) {
     const instructions = trimmed.slice("ai create exit ".length).trim();
     if (!instructions) return { output: "Usage: ai create exit <description>", debug: undefined };
-    return handleAiCreateExitCommand(game.store, { instructions, ...opts });
+    const a = opts.authoring ? { ...opts.authoring, creationSource: "ai-create-exit" } : undefined;
+    return handleAiCreateExitCommand(game.store, { instructions, ...opts, authoring: a });
   }
 
   if (trimmed.startsWith("ai create ")) {
     const description = trimmed.slice("ai create ".length).trim();
     if (!description) return { output: "Usage: ai create <description>", debug: undefined };
-    return handleAiCreateCommand(game.store, { description, ...opts });
+    const a = opts.authoring ? { ...opts.authoring, creationSource: "ai-create" } : undefined;
+    return handleAiCreateCommand(game.store, { description, ...opts, authoring: a });
   }
 
   if (trimmed.startsWith("ai destroy verb confirm ")) {

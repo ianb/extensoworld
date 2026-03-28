@@ -6,6 +6,7 @@ import { getLlm, getLlmProviderOptions } from "./llm.js";
 import { describeProperties, collectTags, buildPropertiesSchema } from "./ai-prompt-helpers.js";
 import { composeCreatePrompt } from "./ai-prompts.js";
 import { getStorage } from "./storage-instance.js";
+import type { AuthoringInfo } from "./storage.js";
 
 export interface AiCreateExitResult {
   output: string;
@@ -138,12 +139,14 @@ export async function handleAiCreateExit(
     gameId,
     prompts,
     debug,
+    authoring,
   }: {
     instructions: string;
     room: Entity;
     gameId: string;
     prompts?: GamePrompts;
     debug?: boolean;
+    authoring?: AuthoringInfo;
   },
 ): Promise<AiCreateExitResult> {
   const systemPrompt = buildSystemPrompt({ prompts, room, store });
@@ -202,6 +205,7 @@ export async function handleAiCreateExit(
     id: entityId,
     tags: ["exit"],
     properties,
+    authoring,
   });
 
   const debugInfo: AiCreateExitDebugInfo | undefined = debug

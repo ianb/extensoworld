@@ -7,87 +7,17 @@ import type {
   UserRecord,
   SessionKey,
 } from "./storage.js";
+import type {
+  D1Database,
+  EntityRow,
+  HandlerRow,
+  EventRow,
+  ConversationRow,
+  UserRow,
+} from "./d1-types.js";
+import { userRowToRecord, rowToAuthoring, authoringBindValues } from "./d1-types.js";
 
-/**
- * Cloudflare D1 database binding type.
- * This matches the D1Database interface from @cloudflare/workers-types.
- */
-export interface D1Database {
-  prepare(query: string): D1PreparedStatement;
-  batch<T>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]>;
-  exec(query: string): Promise<D1ExecResult>;
-}
-
-interface D1PreparedStatement {
-  bind(...values: unknown[]): D1PreparedStatement;
-  first<T>(colName?: string): Promise<T | null>;
-  run(): Promise<D1Result<unknown>>;
-  all<T>(): Promise<D1Result<T>>;
-}
-
-interface D1Result<T> {
-  results: T[];
-  success: boolean;
-}
-
-interface D1ExecResult {
-  count: number;
-}
-
-interface EntityRow {
-  game_id: string;
-  id: string;
-  tags: string;
-  properties: string;
-  created_at: string;
-}
-
-interface HandlerRow {
-  game_id: string;
-  name: string;
-  data: string;
-  created_at: string;
-}
-
-interface EventRow {
-  game_id: string;
-  user_id: string;
-  seq: number;
-  command: string;
-  events: string;
-  timestamp: string;
-}
-
-interface ConversationRow {
-  game_id: string;
-  user_id: string;
-  npc_id: string;
-  word: string;
-  entry: string;
-  created_at: string;
-}
-
-interface UserRow {
-  id: string;
-  display_name: string;
-  email: string | null;
-  google_id: string | null;
-  roles: string;
-  created_at: string;
-  last_login_at: string;
-}
-
-function userRowToRecord(row: UserRow): UserRecord {
-  return {
-    id: row.id,
-    displayName: row.display_name,
-    email: row.email,
-    googleId: row.google_id,
-    roles: JSON.parse(row.roles) as UserRecord["roles"],
-    createdAt: row.created_at,
-    lastLoginAt: row.last_login_at,
-  };
-}
+export type { D1Database } from "./d1-types.js";
 
 export class D1Storage implements RuntimeStorage {
   private db: D1Database;
@@ -109,6 +39,7 @@ export class D1Storage implements RuntimeStorage {
       properties: JSON.parse(row.properties) as Record<string, unknown>,
       createdAt: row.created_at,
       gameId: row.game_id,
+      authoring: rowToAuthoring(row),
     }));
   }
 
@@ -119,8 +50,9 @@ export class D1Storage implements RuntimeStorage {
     }
     await this.db
       .prepare(
-        `INSERT OR REPLACE INTO ai_entities (game_id, id, tags, properties, created_at)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT OR REPLACE INTO ai_entities
+         (game_id, id, tags, properties, created_at, created_by, creation_source, creation_command)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         record.gameId,
@@ -128,6 +60,7 @@ export class D1Storage implements RuntimeStorage {
         JSON.stringify(record.tags),
         JSON.stringify(props),
         record.createdAt,
+        ...authoringBindValues(record.authoring),
       )
       .run();
   }
@@ -157,17 +90,29 @@ export class D1Storage implements RuntimeStorage {
       .all<HandlerRow>();
     return result.results.map((row) => {
       const data = JSON.parse(row.data) as AiHandlerRecord;
-      return { ...data, createdAt: row.created_at, gameId: row.game_id };
+      return {
+        ...data,
+        createdAt: row.created_at,
+        gameId: row.game_id,
+        authoring: rowToAuthoring(row),
+      };
     });
   }
 
   async saveHandler(record: AiHandlerRecord): Promise<void> {
     await this.db
       .prepare(
-        `INSERT OR REPLACE INTO ai_handlers (game_id, name, data, created_at)
-         VALUES (?, ?, ?, ?)`,
+        `INSERT OR REPLACE INTO ai_handlers
+         (game_id, name, data, created_at, created_by, creation_source, creation_command)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
-      .bind(record.gameId, record.name, JSON.stringify(record), record.createdAt)
+      .bind(
+        record.gameId,
+        record.name,
+        JSON.stringify(record),
+        record.createdAt,
+        ...authoringBindValues(record.authoring),
+      )
       .run();
   }
 
@@ -204,16 +149,14 @@ export class D1Storage implements RuntimeStorage {
       )
       .bind(session.gameId, session.userId)
       .first<number>("max_seq");
-    const nextSeq = (maxSeq || 0) + 1;
     await this.db
       .prepare(
-        `INSERT INTO events (game_id, user_id, seq, command, events, timestamp)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        "INSERT INTO events (game_id, user_id, seq, command, events, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
       )
       .bind(
         session.gameId,
         session.userId,
-        nextSeq,
+        (maxSeq || 0) + 1,
         entry.command,
         JSON.stringify(entry.events),
         entry.timestamp,
@@ -238,14 +181,10 @@ export class D1Storage implements RuntimeStorage {
       .prepare("DELETE FROM events WHERE game_id = ? AND user_id = ? AND seq = ?")
       .bind(session.gameId, session.userId, row.seq)
       .run();
-    return {
-      command: row.command,
-      events: JSON.parse(row.events),
-      timestamp: row.timestamp,
-    };
+    return { command: row.command, events: JSON.parse(row.events), timestamp: row.timestamp };
   }
 
-  // --- Conversations (per-user) ---
+  // --- Conversations ---
 
   async loadConversationEntries(gameId: string, npcId: string): Promise<WordEntryRecord[]> {
     const result = await this.db
@@ -261,6 +200,7 @@ export class D1Storage implements RuntimeStorage {
         createdAt: row.created_at,
         gameId: row.game_id,
         npcId: row.npc_id,
+        authoring: rowToAuthoring(row),
       };
     });
   }
@@ -268,8 +208,9 @@ export class D1Storage implements RuntimeStorage {
   async saveWordEntry(record: WordEntryRecord): Promise<void> {
     await this.db
       .prepare(
-        `INSERT OR REPLACE INTO conversation_entries (game_id, user_id, npc_id, word, entry, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT OR REPLACE INTO conversation_entries
+         (game_id, user_id, npc_id, word, entry, created_at, created_by, creation_source, creation_command)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         record.gameId,
@@ -278,6 +219,7 @@ export class D1Storage implements RuntimeStorage {
         record.word,
         JSON.stringify(record),
         record.createdAt,
+        ...authoringBindValues(record.authoring),
       )
       .run();
   }
@@ -306,15 +248,13 @@ export class D1Storage implements RuntimeStorage {
   }
 
   async hasAnyUsers(): Promise<boolean> {
-    const row = await this.db.prepare("SELECT 1 FROM users LIMIT 1").first<{ 1: number }>();
-    return row !== null;
+    return (await this.db.prepare("SELECT 1 FROM users LIMIT 1").first<{ 1: number }>()) !== null;
   }
 
   async createUser(record: UserRecord): Promise<void> {
     await this.db
       .prepare(
-        `INSERT INTO users (id, display_name, email, google_id, roles, created_at, last_login_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        "INSERT INTO users (id, display_name, email, google_id, roles, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
       )
       .bind(
         record.id,

@@ -6,6 +6,7 @@ import { getLlm, getLlmProviderOptions } from "./llm.js";
 import { describeProperties, collectTags, buildPropertiesSchema } from "./ai-prompt-helpers.js";
 import { composeCreatePrompt } from "./ai-prompts.js";
 import { getStorage } from "./storage-instance.js";
+import type { AuthoringInfo } from "./storage.js";
 import { removeMatchingScenery } from "./ai-scenery.js";
 
 export interface AiCreateResult {
@@ -138,7 +139,15 @@ export async function handleAiCreate(
     gameId,
     prompts,
     debug,
-  }: { description: string; room: Entity; gameId: string; prompts?: GamePrompts; debug?: boolean },
+    authoring,
+  }: {
+    description: string;
+    room: Entity;
+    gameId: string;
+    prompts?: GamePrompts;
+    debug?: boolean;
+    authoring?: AuthoringInfo;
+  },
 ): Promise<AiCreateResult> {
   const systemPrompt = buildCreateSystemPrompt({ prompts, room, store });
   const prompt = buildPrompt(store, { description, room });
@@ -200,6 +209,7 @@ export async function handleAiCreate(
     id: entityId,
     tags: response.tags,
     properties,
+    authoring,
   });
 
   // Remove any scenery cache entries that match the new entity's name/aliases

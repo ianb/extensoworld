@@ -9,6 +9,7 @@ import {
   generateSceneryDescription,
 } from "./ai-scenery.js";
 import { getStorage } from "./storage-instance.js";
+import type { AuthoringInfo } from "./storage.js";
 
 interface SceneryResponse {
   output: string;
@@ -24,12 +25,14 @@ export async function handleSceneryCheck(
     gameId,
     prompts,
     debug,
+    authoring,
   }: {
     verb: string;
     objectName: string;
     gameId: string;
     prompts?: GamePrompts;
     debug?: boolean;
+    authoring?: AuthoringInfo;
   },
 ): Promise<SceneryResponse | null> {
   const room = getPlayerRoom(game.store);
@@ -61,6 +64,7 @@ export async function handleSceneryCheck(
     id: room.id,
     tags: Array.from(room.tags),
     properties: { ...room.properties },
+    authoring,
   });
 
   const debugInfo: DebugInfo | undefined =

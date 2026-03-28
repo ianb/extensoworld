@@ -4,7 +4,7 @@ import type { EntityStore, Entity } from "../core/entity.js";
 import type { ResolvedCommand, VerbHandler, WorldEvent } from "../core/verb-types.js";
 import type { VerbRegistry } from "../core/verbs.js";
 import { getLlm, getLlmProviderOptions } from "./llm.js";
-import type { AiHandlerRecord } from "./storage.js";
+import type { AiHandlerRecord, AuthoringInfo } from "./storage.js";
 import { recordToHandler } from "./handler-convert.js";
 import { getStorage } from "./storage-instance.js";
 import { describeProperties, collectTags } from "./ai-prompt-helpers.js";
@@ -177,6 +177,7 @@ export async function handleVerbFallback(
     prompts,
     debug,
     aiInstructions,
+    authoring,
   }: {
     command: ResolvedCommand;
     player: Entity;
@@ -187,6 +188,7 @@ export async function handleVerbFallback(
     prompts?: GamePrompts;
     debug?: boolean;
     aiInstructions?: string;
+    authoring?: AuthoringInfo;
   },
 ): Promise<FallbackResult> {
   const systemPrompt = buildSystemPrompt(libClass, { prompts, room, store });
@@ -229,6 +231,7 @@ export async function handleVerbFallback(
     freeTurn: response.decision === "refuse",
     entityId: targetEntity ? targetEntity.id : undefined,
     perform: buildPerformCode(response),
+    authoring,
   };
 
   await getStorage().saveHandler(record);

@@ -13,6 +13,7 @@ import {
 } from "./ai-prompt-helpers.js";
 import { composeCreatePrompt } from "./ai-prompts.js";
 import { getStorage } from "./storage-instance.js";
+import type { AuthoringInfo } from "./storage.js";
 
 export interface AiCreateRoomDebugInfo {
   systemPrompt: string;
@@ -159,7 +160,13 @@ function uniqueId(store: EntityStore, baseId: string): string {
 
 async function createAndSave(
   store: EntityStore,
-  opts: { id: string; tags: string[]; properties: Record<string, unknown>; gameId: string },
+  opts: {
+    id: string;
+    tags: string[];
+    properties: Record<string, unknown>;
+    gameId: string;
+    authoring?: AuthoringInfo;
+  },
 ): Promise<void> {
   store.create(opts.id, { tags: opts.tags, properties: opts.properties });
   await getStorage().saveAiEntity({ createdAt: new Date().toISOString(), ...opts });
@@ -173,12 +180,14 @@ export async function handleAiCreateRoom(
     gameId,
     prompts,
     debug,
+    authoring,
   }: {
     exit: Entity;
     sourceRoom: Entity;
     gameId: string;
     prompts?: GamePrompts;
     debug?: boolean;
+    authoring?: AuthoringInfo;
   },
 ): Promise<AiCreateRoomResult> {
   const systemPrompt = buildSystemPrompt({ prompts, room: sourceRoom, store });
@@ -205,47 +214,42 @@ export async function handleAiCreateRoom(
     description: roomData.description,
     ...roomData.properties,
   });
-  await createAndSave(store, { id: roomId, tags: roomData.tags, properties: roomProps, gameId });
+  await createAndSave(store, {
+    id: roomId,
+    tags: roomData.tags,
+    properties: roomProps,
+    gameId,
+    authoring,
+  });
 
   const events: WorldEvent[] = [];
-  function setAndRecord(evt: {
-    entityId: string;
+  function setExit({
+    property,
+    value,
+    description,
+  }: {
     property: string;
     value: unknown;
     description: string;
   }): void {
-    store.setProperty(evt.entityId, { name: evt.property, value: evt.value });
-    events.push({ type: "set-property", ...evt });
+    store.setProperty(exit.id, { name: property, value });
+    events.push({ type: "set-property", entityId: exit.id, property, value, description });
   }
-  setAndRecord({
-    entityId: exit.id,
-    property: "destination",
-    value: roomId,
-    description: "Resolved exit",
-  });
-  setAndRecord({
-    entityId: exit.id,
-    property: "destinationIntent",
-    value: undefined,
-    description: "Cleared intent",
-  });
+  setExit({ property: "destination", value: roomId, description: "Resolved exit" });
+  setExit({ property: "destinationIntent", value: undefined, description: "Cleared intent" });
   if (roomData.exitUpdate) {
-    if (roomData.exitUpdate.name) {
-      setAndRecord({
-        entityId: exit.id,
+    if (roomData.exitUpdate.name)
+      setExit({
         property: "name",
         value: roomData.exitUpdate.name,
         description: "Updated exit name",
       });
-    }
-    if (roomData.exitUpdate.description) {
-      setAndRecord({
-        entityId: exit.id,
+    if (roomData.exitUpdate.description)
+      setExit({
         property: "description",
         value: roomData.exitUpdate.description,
         description: "Updated exit desc",
       });
-    }
   }
 
   // Persist the modified exit so changes survive /reset
@@ -255,6 +259,7 @@ export async function handleAiCreateRoom(
     id: exit.id,
     tags: Array.from(exit.tags),
     properties: { ...exit.properties },
+    authoring,
   });
 
   // Return exit
@@ -271,6 +276,7 @@ export async function handleAiCreateRoom(
       description: `Leads back to ${sourceRoom.properties["name"] || sourceRoom.id}.`,
     },
     gameId,
+    authoring,
   });
 
   // Additional exits
@@ -286,7 +292,7 @@ export async function handleAiCreateRoom(
       ...ed.properties,
     });
     if (ed.aliases.length > 0) ep.aliases = ed.aliases;
-    await createAndSave(store, { id: eid, tags: ["exit"], properties: ep, gameId });
+    await createAndSave(store, { id: eid, tags: ["exit"], properties: ep, gameId, authoring });
   }
 
   for (const item of roomData.contents) {
@@ -298,7 +304,7 @@ export async function handleAiCreateRoom(
       ...item.properties,
     });
     if (item.aliases.length > 0) ip.aliases = item.aliases;
-    await createAndSave(store, { id: iid, tags: item.tags, properties: ip, gameId });
+    await createAndSave(store, { id: iid, tags: item.tags, properties: ip, gameId, authoring });
   }
 
   const debugInfo: AiCreateRoomDebugInfo | undefined = debug

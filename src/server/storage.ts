@@ -2,16 +2,25 @@ import type { EntityData, HandlerData } from "../core/game-data.js";
 import type { WordEntry } from "../core/conversation.js";
 import type { WorldEvent } from "../core/verb-types.js";
 
+/** Provenance metadata for AI-generated content */
+export interface AuthoringInfo {
+  createdBy: string;
+  creationSource: string;
+  creationCommand?: string;
+}
+
 /** Metadata added to AI-created entities */
 export type AiEntityRecord = EntityData & {
   createdAt: string;
   gameId: string;
+  authoring?: AuthoringInfo;
 };
 
 /** Metadata added to AI-created handlers */
 export type AiHandlerRecord = HandlerData & {
   createdAt: string;
   gameId: string;
+  authoring?: AuthoringInfo;
 };
 
 /** A single command's worth of events */
@@ -26,6 +35,7 @@ export interface WordEntryRecord extends WordEntry {
   createdAt: string;
   gameId: string;
   npcId: string;
+  authoring?: AuthoringInfo;
 }
 
 /** Identifies a user's session within a game */
