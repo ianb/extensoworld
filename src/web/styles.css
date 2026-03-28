@@ -43,7 +43,7 @@
 }
 
 @layer base {
-  h1, h2, h3, h4, h5, h6 {
+  h1, h2, h3, h4, h5, h6, .font-heading {
     font-family: var(--font-heading);
   }
 
@@ -90,36 +90,74 @@
     --th-removed: oklch(0.580 0.200 25);      /* red-500 */
   }
 
-  /* Colossal Cave: earthy stone cavern feel */
+  /* Colossal Cave: manila/brown retro feel, inspired by app icon */
   [data-theme="cave"] {
-    --th-font-sans: "Roboto Mono", ui-monospace, monospace;
-    --th-font-mono: "Roboto Mono", ui-monospace, monospace;
-    --th-font-heading: Georgia, "Times New Roman", serif;
+    --th-font-sans: "Special Elite", cursive;
+    --th-font-mono: "Special Elite", cursive;
+    --th-font-heading: "Special Elite", cursive;
 
-    --th-page: oklch(0.15 0.01 60);           /* warm dark brown */
-    --th-surface: oklch(0.20 0.015 55);       /* slightly lighter stone */
-    --th-input: oklch(0.26 0.015 50);         /* warm gray-brown */
+    --th-page: oklch(0.93 0.03 75);           /* manila/cream */
+    --th-surface: oklch(0.88 0.035 72);       /* slightly darker parchment */
+    --th-input: oklch(0.95 0.02 75);          /* lighter cream for inputs */
 
-    --th-content: oklch(0.88 0.02 70);        /* warm off-white */
+    --th-content: oklch(0.18 0.05 50);        /* very dark brown — needs to stay readable at /25 opacity on light bg */
 
-    --th-accent: oklch(0.70 0.12 70);         /* warm amber */
-    --th-accent-hover: oklch(0.78 0.10 70);   /* lighter amber */
-    --th-accent-bold: oklch(0.50 0.12 55);    /* deep amber-brown */
+    --th-accent: oklch(0.45 0.12 50);         /* rich brown (icon brown) */
+    --th-accent-hover: oklch(0.38 0.10 50);   /* darker brown on hover */
+    --th-accent-bold: oklch(0.45 0.12 50);    /* same rich brown for buttons */
 
-    --th-convo: oklch(0.65 0.10 160);         /* muted teal */
-    --th-convo-bg: oklch(0.20 0.03 160);      /* dark teal */
+    --th-convo: oklch(0.40 0.08 160);         /* muted dark teal */
+    --th-convo-bg: oklch(0.90 0.03 160);      /* light teal tint */
 
-    --th-highlight-entity: oklch(0.75 0.14 85);  /* golden */
-    --th-highlight-topic: oklch(0.65 0.10 160);  /* teal */
-    --th-highlight-direction: oklch(0.65 0.12 140); /* sage green */
+    --th-highlight-entity: oklch(0.45 0.14 50);  /* brown, matching accent */
+    --th-highlight-topic: oklch(0.40 0.08 160);  /* dark teal */
+    --th-highlight-direction: oklch(0.38 0.10 145); /* forest green */
 
-    --th-ai: oklch(0.60 0.12 300);            /* muted purple */
-    --th-command: oklch(0.60 0.15 25);        /* dusty red */
+    --th-ai: oklch(0.45 0.10 300);            /* muted purple */
+    --th-command: oklch(0.45 0.15 25);        /* brick red */
 
-    --th-danger: oklch(0.58 0.18 25);
-    --th-caution: oklch(0.70 0.14 85);        /* warm yellow */
+    --th-danger: oklch(0.45 0.18 25);         /* dark red */
+    --th-caution: oklch(0.50 0.12 85);        /* dark amber */
 
-    --th-added: oklch(0.60 0.15 145);
-    --th-removed: oklch(0.58 0.18 25);
+    --th-added: oklch(0.40 0.14 145);         /* dark green */
+    --th-removed: oklch(0.45 0.18 25);        /* dark red */
+  }
+
+  /* The Aaru: dark sci-fi generation ship */
+  [data-theme="aaru"] body {
+    letter-spacing: 0.03em;
+    line-height: 1.7;
+  }
+
+  [data-theme="aaru"] {
+    --th-font-sans: "Electrolize", sans-serif;
+    --th-font-mono: "Electrolize", sans-serif;
+    --th-font-heading: "Audiowide", sans-serif;
+
+    --th-page: oklch(0.12 0.02 260);          /* deep space blue-black */
+    --th-surface: oklch(0.17 0.025 255);      /* dark hull panel */
+    --th-input: oklch(0.22 0.02 250);         /* recessed panel */
+
+    --th-content: oklch(0.85 0.04 210);       /* cool blue-white display text */
+
+    --th-accent: oklch(0.70 0.18 210);        /* bright cyan-blue */
+    --th-accent-hover: oklch(0.80 0.15 210);  /* lighter glow */
+    --th-accent-bold: oklch(0.50 0.18 220);   /* deep interface blue */
+
+    --th-convo: oklch(0.65 0.15 180);         /* teal terminal */
+    --th-convo-bg: oklch(0.15 0.04 180);      /* dark teal panel */
+
+    --th-highlight-entity: oklch(0.75 0.15 90);  /* amber warning color */
+    --th-highlight-topic: oklch(0.70 0.15 180);  /* teal */
+    --th-highlight-direction: oklch(0.70 0.15 150); /* green nav marker */
+
+    --th-ai: oklch(0.65 0.18 290);            /* violet system process */
+    --th-command: oklch(0.65 0.18 30);         /* orange-red alert */
+
+    --th-danger: oklch(0.60 0.22 30);         /* red alert */
+    --th-caution: oklch(0.75 0.16 90);        /* amber alert */
+
+    --th-added: oklch(0.65 0.18 150);         /* green status */
+    --th-removed: oklch(0.60 0.22 30);        /* red status */
   }
 }

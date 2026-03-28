@@ -57,10 +57,11 @@ export function HighlightedText({
 
   return segments.map((seg, i) => {
     if (seg.type === "entity") {
+      const isRoom = seg.entityId ? seg.entityId.startsWith("room:") : false;
       return (
         <span
           key={i}
-          className="cursor-pointer text-highlight-entity hover:underline"
+          className={`cursor-pointer text-highlight-entity hover:underline ${isRoom ? "font-heading font-bold" : ""}`}
           onClick={() => {
             if (onEntityClick && seg.entityId) {
               onEntityClick(seg.entityId);

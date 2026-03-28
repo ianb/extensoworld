@@ -3,7 +3,8 @@
     "slug": "the-aaru",
     "title": "The Aaru",
     "description": "A thousand-year generation ship, now silent. You wake in a hibernation pod with no memory. Explore the vast, strange vessel and piece together what happened.",
-    "seed": 7
+    "seed": 7,
+    "theme": "aaru"
   },
   "properties": [
     {
