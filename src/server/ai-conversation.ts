@@ -17,6 +17,18 @@ export interface AiConversationResult {
   durationMs: number;
 }
 
+const effectSchema = z.object({
+  type: z.enum(["set-property", "move", "close-conversation"]).describe(
+    `"set-property" to change a property on an entity.
+"move" to move an entity to a new location.
+"close-conversation" to end the conversation after this response.`,
+  ),
+  entityId: z.string().optional().describe("Target entity ID. Defaults to the NPC if omitted."),
+  property: z.string().optional().describe("Property to change (for set-property)."),
+  value: z.unknown().optional().describe("New value (for set-property)."),
+  description: z.string().optional().describe("What happened, for the event log."),
+});
+
 const responseSchema = z.object({
   decision: z.enum(["respond", "no-words", "no-response"]).describe(
     `"respond" if the NPC would react to this topic.
@@ -31,6 +43,11 @@ const responseSchema = z.object({
     .string()
     .optional()
     .describe("NPC reaction (speech in quotes, actions as narration). Only for respond."),
+  effects: z
+    .array(effectSchema)
+    .describe(
+      "0-2 world changes caused by this conversation. Use sparingly — most responses are just dialogue. But sometimes an NPC should give the player an item, open a passage, change their own state, or end the conversation. Only for respond.",
+    ),
   highlights: z
     .array(z.string())
     .describe("0-2 new topic words revealed by this response. Only for respond."),
@@ -104,6 +121,7 @@ ${secretSection}
 - Highlights: 0-2 new topic words the response naturally leads to. Do not highlight words that already exist in the conversation.
 - Stay consistent with the NPC's established personality, knowledge, and tone from the existing conversation entries.
 - Study the existing conversation carefully — match its style, voice, and level of detail.
+- Effects: most responses should have NO effects. Use effects when the NPC would naturally act — handing over an item (move), opening a passage (set-property), becoming hostile or friendly (set-property), ending the conversation (close-conversation). The entityId defaults to the NPC if omitted.
 </guidelines>`;
 }
 
@@ -182,6 +200,7 @@ export async function handleAiConversationFallback(
     word,
     narration: response.narration || `You say "${word}."`,
     response: response.response || "",
+    effects: response.effects.length > 0 ? response.effects : undefined,
     highlights: response.highlights.length > 0 ? response.highlights : undefined,
   };
 

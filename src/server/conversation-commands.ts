@@ -232,11 +232,34 @@ async function handleUnknownWord(
     }
   }
 
+  // Apply effects from AI-generated entry
+  let closeConversation = false;
+  if (aiResult.entry.effects && aiResult.entry.effects.length > 0) {
+    const events = applyConversationEffects(aiResult.entry.effects, {
+      store: game.store,
+      npcId: state.npcId,
+    });
+    closeConversation = aiResult.entry.effects.some((e) => e.type === "close-conversation");
+    if (events.length > 0) {
+      const logEntry: EventLogEntry = {
+        command: word,
+        events,
+        timestamp: new Date().toISOString(),
+      };
+      await getStorage().appendEvent(session, logEntry);
+    }
+  }
+
   const parts: string[] = [];
   if (aiResult.entry.narration) parts.push(aiResult.entry.narration);
   if (aiResult.entry.response) parts.push(aiResult.entry.response);
   const newKnownWords = Array.from(state.knownWords);
   const output = highlightTopics(parts.join("\n"), newKnownWords);
+
+  if (closeConversation) {
+    game.conversationState = undefined;
+    return { output, conversationMode: null };
+  }
 
   return {
     output,
