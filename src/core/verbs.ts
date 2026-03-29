@@ -147,23 +147,43 @@ export class VerbRegistry {
     if (!performer) {
       return { outcome: "unhandled" };
     }
-    const result = performer.perform(context);
 
-    for (const event of result.events) {
-      if (event.type === "create-entity") {
-        if (!context.store.has(event.entityId)) {
-          const data = event.value as { tags: string[]; properties: Record<string, unknown> };
-          context.store.create(event.entityId, { tags: data.tags, properties: data.properties });
-        }
-      } else if (event.type === "set-property") {
-        if (event.property) {
-          context.store.setProperty(event.entityId, { name: event.property, value: event.value });
-        }
-      } else if (event.type === "remove-property") {
-        if (event.property) {
-          context.store.removeProperty(event.entityId, event.property);
+    let result;
+    try {
+      result = performer.perform(context);
+      for (const event of result.events) {
+        if (event.type === "create-entity") {
+          if (!context.store.has(event.entityId)) {
+            const data = event.value as { tags: string[]; properties: Record<string, unknown> };
+            context.store.create(event.entityId, {
+              tags: data.tags,
+              properties: data.properties,
+            });
+          }
+        } else if (event.type === "set-property") {
+          if (event.property) {
+            context.store.setProperty(event.entityId, {
+              name: event.property,
+              value: event.value,
+            });
+          }
+        } else if (event.type === "remove-property") {
+          if (event.property) {
+            context.store.removeProperty(event.entityId, event.property);
+          }
         }
       }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[verbs] Handler "${performer.name}" threw: ${msg}`);
+      // Remove broken AI handlers so they can be regenerated
+      if (performer.name.startsWith("ai-")) {
+        this.removeByName(performer.name);
+        console.log(`[verbs] Removed broken handler: ${performer.name}`);
+        return { outcome: "unhandled" };
+      }
+      // Non-AI handler errors still surface
+      throw err as Error;
     }
 
     return {
