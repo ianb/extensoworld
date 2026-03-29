@@ -78,14 +78,7 @@ function buildPerform(
 ): (context: VerbContext) => PerformResult {
   const fn = buildSandboxedFunction(code);
   return (context: VerbContext): PerformResult => {
-    let result;
-    try {
-      result = fn(handlerVars(context, createLib)) as PerformResult;
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[handler-eval] Handler code threw: ${msg}`);
-      return { output: "{!Something went wrong. The action fizzles.!}", events: [] };
-    }
+    const result = fn(handlerVars(context, createLib)) as PerformResult;
     if (!result || typeof result.output !== "string") {
       return { output: "Something strange happens, but nothing changes.", events: [] };
     }

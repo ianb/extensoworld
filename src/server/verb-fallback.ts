@@ -7,6 +7,7 @@ import { getLlm, getLlmProviderOptions } from "./llm.js";
 import type { AiHandlerRecord, AuthoringInfo } from "./storage.js";
 import { recordToHandler } from "./handler-convert.js";
 import { getStorage } from "./storage-instance.js";
+import { executeAndSave, buildPerformCode } from "./handler-execute.js";
 import { describeProperties, collectTags } from "./ai-prompt-helpers.js";
 import type { HandlerLib } from "../core/handler-lib.js";
 import type { GamePrompts } from "../core/game-data.js";
@@ -146,41 +147,6 @@ function buildPrompt(
 }
 
 /**
- * Convert the LLM response into a perform code string for HandlerData.
- */
-function buildPerformCode(response: {
-  decision: "perform" | "refuse";
-  message: string;
-  code?: string;
-  events: Array<{ type: string; property: string; value: unknown; description: string }>;
-}): string {
-  if (response.decision === "refuse") {
-    return `return lib.result("{!" + ${JSON.stringify(response.message)} + "!}");`;
-  }
-
-  if (response.code) {
-    // Fix common AI mistakes: accessing entity fields directly instead of via .properties
-    return response.code
-      .replace(/\bobject\.description\b/g, "object.properties.description")
-      .replace(/\bobject\.name\b/g, "object.properties.name")
-      .replace(/\bplayer\.location\b/g, "player.properties.location")
-      .replace(/\broom\.description\b/g, "room.properties.description")
-      .replace(/\broom\.name\b/g, "room.properties.name");
-  }
-
-  // Static message + events
-  if (response.events.length === 0) {
-    return `return lib.result(${JSON.stringify(response.message)});`;
-  }
-
-  const eventStrs = response.events.map(
-    (e) =>
-      `lib.setEvent(object.id, ${JSON.stringify({ property: e.property, value: e.value, description: e.description })})`,
-  );
-  return `return { output: ${JSON.stringify(response.message)}, events: [${eventStrs.join(", ")}] };`;
-}
-
-/**
  * Ask the LLM to handle an unrecognized verb+object combination.
  * If the LLM decides the action should work, a new VerbHandler is registered
  * so the same action will work again without another LLM call.
@@ -254,40 +220,57 @@ export async function handleVerbFallback(
     authoring,
   };
 
-  await getStorage().saveHandler(record);
-  const handler = recordToHandler(record);
-  verbs.register(handler);
-
   const debugInfo: FallbackDebugInfo | undefined = debug
     ? { systemPrompt, prompt, response, schema: z.toJSONSchema(fallbackResponseSchema), durationMs }
     : undefined;
-
   const notes = response.notes || undefined;
 
   if (response.decision === "refuse") {
+    await getStorage().saveHandler(record);
+    const handler = recordToHandler(record);
+    verbs.register(handler);
     return { output: `{!${response.message}!}`, notes, events: [], handler, debug: debugInfo };
   }
 
-  // Execute immediately for the current command
-  const performResult = handler.perform({ store, command, player, room });
-
-  // Apply events
-  for (const event of performResult.events) {
-    if (event.type === "create-entity") {
-      if (!store.has(event.entityId)) {
-        const data = event.value as { tags: string[]; properties: Record<string, unknown> };
-        store.create(event.entityId, { tags: data.tags, properties: data.properties });
-      }
-    } else if (event.type === "set-property" && event.property) {
-      store.setProperty(event.entityId, { name: event.property, value: event.value });
-    }
+  // Execute immediately — if it throws, delete and retry once
+  const execResult = await executeAndSave(store, {
+    record,
+    verbs,
+    command,
+    player,
+    room,
+  });
+  if (execResult) {
+    return { ...execResult, notes, debug: debugInfo };
   }
-
+  // First attempt failed — retry with simpler handler
+  console.log("[ai-fallback] Retrying after handler error...");
+  const retryPrompt =
+    prompt +
+    "\n\n<retry>Previous handler threw an error. Generate a simpler handler — prefer static messages over code, avoid setting properties that might not exist.</retry>";
+  const retryResp = await generateObject({
+    model: getLlm(),
+    schema: fallbackResponseSchema,
+    system: systemPrompt,
+    prompt: retryPrompt,
+    providerOptions: getLlmProviderOptions(),
+  });
+  const retryRecord: AiHandlerRecord = { ...record, perform: buildPerformCode(retryResp.object) };
+  const retryExec = await executeAndSave(store, {
+    record: retryRecord,
+    verbs,
+    command,
+    player,
+    room,
+  });
+  if (retryExec) {
+    return { ...retryExec, notes, debug: debugInfo };
+  }
   return {
-    output: performResult.output,
+    output: "{!Something went wrong trying to do that. Try a different approach.!}",
     notes,
-    events: performResult.events,
-    handler,
+    events: [],
+    handler: null,
     debug: debugInfo,
   };
 }
