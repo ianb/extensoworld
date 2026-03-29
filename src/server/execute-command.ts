@@ -6,6 +6,7 @@ import { handleUnresolvedExit, handleVerbFallbackCommand } from "./ai-commands.j
 import { handleConversationWord, checkForConversationStart } from "./conversation-commands.js";
 import { handleSceneryCheck } from "./scenery-commands.js";
 import { handleSpecialCommand } from "./special-commands.js";
+import { RecentOutputBuffer } from "./recent-output.js";
 
 export interface CommandInput {
   gameId: string;
@@ -28,6 +29,50 @@ interface ExecuteOptions {
   onAiStart?: () => void;
 }
 
+async function trySceneryFallback(
+  game: GameInstance,
+  {
+    unresolvedObject,
+    hasAiRole,
+    input,
+    authoring,
+    existingDebug,
+    onAiStart,
+  }: {
+    unresolvedObject: { verb: string; objectName: string };
+    hasAiRole: boolean;
+    input: CommandInput;
+    authoring: AuthoringInfo;
+    existingDebug?: unknown;
+    onAiStart?: () => void;
+  },
+): Promise<CommandResult | null> {
+  if (!hasAiRole) return { output: "You don't see that here." };
+  if (onAiStart) onAiStart();
+  const sceneryAuthoring = { ...authoring, creationSource: "scenery" };
+  const sceneryResult = await handleSceneryCheck(game, {
+    verb: unresolvedObject.verb,
+    objectName: unresolvedObject.objectName,
+    gameId: input.gameId,
+    prompts: game.prompts,
+    debug: input.debug,
+    authoring: sceneryAuthoring,
+  });
+  if (sceneryResult) {
+    return { output: sceneryResult.output, debug: sceneryResult.debug || existingDebug };
+  }
+  return null;
+}
+
+function recordOutput(
+  game: GameInstance,
+  { command, output, entityId }: { command: string; output: string; entityId?: string },
+): void {
+  if (game.recentOutputs) {
+    game.recentOutputs.add({ command, output, sourceEntityId: entityId });
+  }
+}
+
 export async function executeCommand(
   input: CommandInput,
   { game, reinitGame, onAiStart }: ExecuteOptions,
@@ -35,6 +80,10 @@ export async function executeCommand(
   const trimmed = input.text.trim();
   const session: SessionKey = { gameId: input.gameId, userId: input.userId };
   const hasAiRole = !input.roles || input.roles.includes("ai");
+  // Ensure recent output buffer exists on game instance
+  if (!game.recentOutputs) {
+    game.recentOutputs = new RecentOutputBuffer(3);
+  }
   const authoring: AuthoringInfo = {
     createdBy: input.userId,
     creationSource: "unknown",
@@ -92,22 +141,17 @@ export async function executeCommand(
     });
   }
 
-  // Check for scenery — words in the room description that can be examined
+  // Check for scenery — words in descriptions or recent output
   if (result.unresolvedObject) {
-    if (!hasAiRole) return { output: result.output || "You don't see that here." };
-    if (onAiStart) onAiStart();
-    const sceneryAuthoring = { ...authoring, creationSource: "scenery" };
-    const sceneryResult = await handleSceneryCheck(game, {
-      verb: result.unresolvedObject.verb,
-      objectName: result.unresolvedObject.objectName,
-      gameId: input.gameId,
-      prompts: game.prompts,
-      debug: input.debug,
-      authoring: sceneryAuthoring,
+    const sceneryRes = await trySceneryFallback(game, {
+      unresolvedObject: result.unresolvedObject,
+      hasAiRole,
+      input,
+      authoring,
+      existingDebug: result.debug,
+      onAiStart,
     });
-    if (sceneryResult) {
-      return { output: sceneryResult.output, debug: sceneryResult.debug || result.debug };
-    }
+    if (sceneryRes) return sceneryRes;
   }
 
   if (result.unhandled) {
@@ -133,6 +177,11 @@ export async function executeCommand(
       };
       await getStorage().appendEvent(session, entry);
     }
+    const targetId =
+      result.unhandled.command.form !== "intransitive"
+        ? result.unhandled.command.object.id
+        : undefined;
+    recordOutput(game, { command: trimmed, output: fallback.output, entityId: targetId });
     return { output: fallback.output, aiOutput: fallback.aiOutput, debug: fallback.debug };
   }
 
@@ -160,5 +209,7 @@ export async function executeCommand(
     };
   }
 
+  const primaryEntityId = result.events.length > 0 ? result.events[0]!.entityId : undefined;
+  recordOutput(game, { command: trimmed, output: result.output, entityId: primaryEntityId });
   return { output: result.output, debug: result.debug };
 }

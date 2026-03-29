@@ -318,5 +318,12 @@ Based on effort vs. impact:
 6. ~~**Use X with Y guidance** (#2)~~ — **Done.** Verb fallback prompt now documents `indirect` variable, adds ditransitive code example, and steers AI toward mechanical outcomes for combinations.
 7. ~~**Room prompts with secrets** (#4)~~ — **Done.** Secrets backfilled on existing game content, creation prompt guidance added for both worlds.
 8. **Richer properties** (#3) — Needs per-world design work. Creates interaction vocabulary.
+
+### Recently completed (not in original list)
+- **Item description scenery** — words in item descriptions are now examinable like room scenery
+- **Recent output scenery** — words from the last 3 command outputs can be examined, with source entity context
+- **Scenery aliases** — AI generates aliases for scenery entries so multiple phrasings work
+- **Handler error recovery** — broken AI handlers auto-removed on failure, regenerated with retry
+- **Notes hidden from non-debug** — AI reasoning notes only show in debug mode
 9. **Overlapping systems** (#9) — Architectural. Start with property-based reactions as a prototype.
 10. **Drama manager** (#10) — Architectural. Start with ambient events as a prototype.

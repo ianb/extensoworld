@@ -8,6 +8,7 @@ import { composeVerbPrompt } from "./ai-prompts.js";
 /** Scenery descriptions stored on the room entity */
 export interface SceneryEntry {
   word: string;
+  aliases?: string[];
   description: string;
   rejection: string;
 }
@@ -34,44 +35,71 @@ const responseSchema = z.object({
     .describe(
       "A short in-character response when the player tries to interact with this beyond looking. E.g. 'The banner is fastened high above your reach.'",
     ),
+  aliases: z
+    .array(z.string())
+    .describe(
+      "Other words or short phrases the player might use to refer to this same detail. Include terms mentioned in your description that the player might want to examine further. 0-4 aliases.",
+    ),
 });
 
 function buildSystemPrompt({
   room,
   store,
+  sourceEntity,
   prompts,
 }: {
   room: Entity;
   store: EntityStore;
+  sourceEntity?: Entity;
   prompts?: GamePrompts;
 }): string {
   const styleSection = composeVerbPrompt({ prompts, room, store });
+  // Collect secrets from room and source entity
+  const secrets: string[] = [];
   const roomSecret = room.properties["secret"] as string | undefined;
-  const secretSection = roomSecret
-    ? `\n<secret>\nHidden information about this room. Be aware of it when describing scenery, but don't reveal it directly. If the scenery word naturally relates to the secret, let hints emerge.\n\n${roomSecret}\n</secret>\n`
-    : "";
+  if (roomSecret) secrets.push(`Room: ${roomSecret}`);
+  if (sourceEntity) {
+    const s = sourceEntity.properties["secret"] as string | undefined;
+    if (s) secrets.push(`${sourceEntity.properties["name"] || sourceEntity.id}: ${s}`);
+  }
+  const secretSection =
+    secrets.length > 0
+      ? `\n<secret>\nHidden information. Be aware of it when describing scenery, but don't reveal it directly. If the word naturally relates to the secret, let hints emerge.\n\n${secrets.join("\n")}\n</secret>\n`
+      : "";
   return `<role>
-You are describing a scenery detail in a text adventure room. The player is examining something mentioned in the room description. This is atmospheric detail, not a full game object — it exists to make the world feel richer.
+You are describing a detail the player wants to examine more closely. It may come from a room description, an object's description, or something mentioned in a recent interaction. Write atmospheric, vivid detail that rewards curiosity.
 </role>
 
 ${styleSection}
 ${secretSection}
 <guidelines>
 - Write a vivid 1-3 sentence description of what the player sees on closer inspection.
-- Stay consistent with the room description and world tone.
-- The "rejection" is a brief response when the player tries to interact with this beyond looking. It can be physical ("fastened to the wall"), dismissive ("that won't really help"), or just deflecting ("you have more important things to worry about"). Variety is good — don't always construct a physical reason.
-- These are atmospheric elements — they reward curiosity but aren't interactive beyond looking.
+- Stay consistent with the world tone and the context the word appeared in.
+- The "rejection" is a brief response when the player tries to interact beyond looking.
+- Include "aliases" — other words or phrases from your description that the player might want to examine next. This creates a chain of inspectable details.
 </guidelines>`;
 }
 
-function buildPrompt({ word, room }: { word: string; room: Entity }): string {
-  const roomName = (room.properties["name"] as string) || room.id;
-  const roomDesc = (room.properties["description"] as string) || "";
-  return `<room>
-${roomName}: ${roomDesc}
-</room>
-
-<examine-word>${word}</examine-word>`;
+function buildPrompt(opts: {
+  word: string;
+  room: Entity;
+  sourceEntity?: Entity;
+  recentOutput?: string;
+}): string {
+  const parts: string[] = [];
+  const roomName = (opts.room.properties["name"] as string) || opts.room.id;
+  const roomDesc = (opts.room.properties["description"] as string) || "";
+  parts.push(`<room>\n${roomName}: ${roomDesc}\n</room>`);
+  if (opts.sourceEntity) {
+    const name = (opts.sourceEntity.properties["name"] as string) || opts.sourceEntity.id;
+    const desc = (opts.sourceEntity.properties["description"] as string) || "";
+    parts.push(`<source-object>\n${name}: ${desc}\n</source-object>`);
+  }
+  if (opts.recentOutput) {
+    parts.push(`<recent-interaction>\n${opts.recentOutput}\n</recent-interaction>`);
+  }
+  parts.push(`<examine-word>${opts.word}</examine-word>`);
+  return parts.join("\n\n");
 }
 
 /** Generate singular/plural variants of a word */
@@ -111,17 +139,46 @@ export function isSceneryWord(word: string, room: Entity): boolean {
   return false;
 }
 
+/** Check if a word appears in any visible item's description */
+export function isItemSceneryWord(
+  word: string,
+  { store, roomId, playerId }: { store: EntityStore; roomId: string; playerId: string },
+): { word: string; entityId: string } | null {
+  const candidates = [...store.getContents(roomId), ...store.getContents(playerId)];
+  const lower = word.toLowerCase();
+  for (const entity of candidates) {
+    if (entity.tags.has("exit") || entity.tags.has("player")) continue;
+    const desc = (entity.properties["description"] as string) || "";
+    if (!desc) continue;
+    const escaped = lower.replace(/[$()*+.?[\\\]^{|}]/g, "\\$&");
+    // eslint-disable-next-line security/detect-non-literal-regexp -- escaped above
+    const pattern = new RegExp(`\\b${escaped}\\b`, "i");
+    if (pattern.test(desc)) {
+      return { word, entityId: entity.id };
+    }
+  }
+  return null;
+}
+
 /** Check if a verb is an examine-type verb */
 export function isExamineVerb(verb: string): boolean {
   return EXAMINE_VERBS.has(verb);
 }
 
-/** Get stored scenery entry for a word, if it exists */
+/** Get stored scenery entry for a word, if it exists (checks word and aliases) */
 export function getStoredScenery(room: Entity, word: string): SceneryEntry | null {
   const scenery = room.properties["scenery"] as SceneryEntry[] | undefined;
   if (!scenery) return null;
   const lower = word.toLowerCase();
-  return scenery.find((s) => s.word.toLowerCase() === lower) || null;
+  return (
+    scenery.find((s) => {
+      if (s.word.toLowerCase() === lower) return true;
+      if (s.aliases) {
+        return s.aliases.some((a) => a.toLowerCase() === lower);
+      }
+      return false;
+    }) || null
+  );
 }
 
 /** Remove scenery entries that match a name or aliases (e.g., when an entity is created) */
@@ -138,16 +195,20 @@ export function removeMatchingScenery(
   }
 }
 
-/** Generate and store a scenery description on the room entity */
+/** Generate and store a scenery description */
 export async function generateSceneryDescription(
   store: EntityStore,
   {
     word,
     room,
+    sourceEntity,
+    recentOutput,
     prompts,
   }: {
     word: string;
     room: Entity;
+    sourceEntity?: Entity;
+    recentOutput?: string;
     prompts?: GamePrompts;
   },
 ): Promise<{
@@ -160,14 +221,16 @@ export async function generateSceneryDescription(
     durationMs: number;
   };
 }> {
-  // Return existing entry if already generated
-  const existing = getStoredScenery(room, word);
+  // Check for existing entry on the target entity (source or room)
+  const storeOn = sourceEntity || room;
+  const existing = getStoredScenery(storeOn, word);
   if (existing) return { entry: existing };
 
-  const systemPrompt = buildSystemPrompt({ room, store, prompts });
-  const prompt = buildPrompt({ word, room });
+  const systemPrompt = buildSystemPrompt({ room, store, sourceEntity, prompts });
+  const prompt = buildPrompt({ word, room, sourceEntity, recentOutput });
 
-  console.log(`[ai-scenery] Generating description for "${word}" in ${room.id}`);
+  const label = sourceEntity ? `${sourceEntity.id}` : room.id;
+  console.log(`[ai-scenery] Generating description for "${word}" on ${label}`);
   const startTime = Date.now();
 
   const result = await generateObject({
@@ -183,16 +246,14 @@ export async function generateSceneryDescription(
 
   const entry: SceneryEntry = {
     word: word.toLowerCase(),
+    aliases: result.object.aliases.length > 0 ? result.object.aliases : undefined,
     description: result.object.description,
     rejection: result.object.rejection,
   };
 
-  // Store on the room entity
-  const prior = (room.properties["scenery"] as SceneryEntry[]) || [];
-  store.setProperty(room.id, {
-    name: "scenery",
-    value: [...prior, entry],
-  });
+  // Store scenery on the source entity (or room if no specific source)
+  const prior = (storeOn.properties["scenery"] as SceneryEntry[]) || [];
+  store.setProperty(storeOn.id, { name: "scenery", value: [...prior, entry] });
 
   return {
     entry,

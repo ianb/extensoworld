@@ -3,6 +3,7 @@ import type { VerbRegistry } from "../core/verbs.js";
 import type { HandlerLib } from "../core/handler-lib.js";
 import type { GamePrompts, ConversationFileData } from "../core/game-data.js";
 import type { ConversationState } from "../core/conversation.js";
+import type { RecentOutputBuffer } from "../server/recent-output.js";
 
 export interface GameDefinition {
   slug: string;
@@ -19,6 +20,7 @@ export interface GameInstance {
   prompts?: GamePrompts;
   conversations?: Record<string, ConversationFileData>;
   conversationState?: ConversationState;
+  recentOutputs?: RecentOutputBuffer;
 }
 
 const games: Map<string, GameDefinition> = new Map();
