@@ -316,7 +316,7 @@ Based on effort vs. impact:
 4. **Affordance-oriented descriptions** (#7) — Prompt change only. Makes every room and object more interactive.
 5. **Nearby entity context** (#1) — Medium effort. Makes AI generation context-aware, creates a connected world. Combines powerfully with secrets.
 6. **Use X with Y guidance** (#2) — Prompt changes + some context gathering. Improves the most interesting interactions.
-7. **Room prompts with secrets** (#4) — Content authoring. Builds on #8 with hand-authored latent possibilities per zone.
+7. ~~**Room prompts with secrets** (#4)~~ — **Done.** Secrets backfilled on existing game content, creation prompt guidance added for both worlds.
 8. **Richer properties** (#3) — Needs per-world design work. Creates interaction vocabulary.
 9. **Overlapping systems** (#9) — Architectural. Start with property-based reactions as a prototype.
 10. **Drama manager** (#10) — Architectural. Start with ambient events as a prototype.
