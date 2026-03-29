@@ -40,7 +40,7 @@ function buildCreateSchema(store: EntityStore) {
     description: z
       .string()
       .describe(
-        "The full description shown when examining the object. 1-2 sentences, classic text adventure style.",
+        "The full description shown when examining the object. 1-2 sentences. Suggest what the player might do — mention physical details that imply interaction.",
       ),
     shortDescription: z
       .string()
@@ -130,7 +130,7 @@ ${styleSection}
 - Set "portable" tag for anything the player should be able to carry.
 - For large/immovable things, set the "fixed" PROPERTY to true (not as a tag) and set "takeRefusal" to a short in-character reason why it can't be taken (e.g., "The moss is growing directly on the cave wall."). Both go in properties, not tags.
 - Provide good aliases — common synonyms the player might use.
-- The description should be vivid but concise, 1-2 sentences. It's what the player sees when they examine the object or look at the room.
+- Descriptions should suggest what the player might DO, not just what they see. Mention physical details that imply interaction: switches that can be flipped, containers that can be opened, surfaces that show wear from use. 1-2 sentences.
 - For properties, only include non-default values. Don't set "open: false" or "locked: false" — those are defaults.
 - The idSlug should be a short kebab-case identifier: "rusty-sword", "sleeping-cat", "oak-table".
 - The idCategory groups the entity: "item", "npc", "furniture", etc.

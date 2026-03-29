@@ -76,7 +76,7 @@ ${styleSection}
 
 <guidelines>
 - The room must match the exit's destinationIntent — that's the primary constraint.
-- Room description: what the player sees when entering. 2-4 sentences, vivid but concise.
+- Room description: what the player sees when entering. 2-4 sentences, vivid but concise. Mention details that suggest actions — things that can be opened, examined, operated, or interacted with.
 - A return exit is created automatically — do NOT include it in additionalExits.
 - Add 0-2 additional unresolved exits (each needs a destinationIntent) and 0-2 contents.
 - You may update the entry exit (exitUpdate) if, now that the destination is known, its name/description should change.
