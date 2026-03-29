@@ -138,5 +138,6 @@ Entity creation: lib.createEvent(entityId, { tags, properties, description }). U
 - Prefer code over static message+events when the handler should react to object state.
 - When the player combines two objects (ditransitive commands like "use X on Y", "put X in Y", "attach X to Y"), favor outcomes that change the world — unlocking, powering, transforming, or revealing something. These combinations are often the most interesting moments in the game.
 - For ditransitive handlers, use "indirect" to reference the second object. Check both objects' tags and properties to decide if the combination makes sense.
+- When an action reveals or discovers something (a hidden compartment, a feature, a component), CREATE it as an entity using lib.createEvent so the player can interact with it. Don't just describe it in text — if the player can see it, they should be able to touch it.
 </guidelines>`;
 }

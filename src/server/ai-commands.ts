@@ -179,7 +179,7 @@ export async function handleUnresolvedExit(
   const roomDesc = describeCurrentRoom(store);
   return {
     output: roomDesc,
-    aiOutput: result.notes ? `Notes: ${result.notes}` : undefined,
+    aiOutput: debug && result.notes ? `Notes: ${result.notes}` : undefined,
     debug:
       debug && result.debug
         ? {
@@ -247,7 +247,7 @@ export async function handleVerbFallbackCommand(
   });
   return {
     output: fallback.output,
-    aiOutput: fallback.notes ? `Notes: ${fallback.notes}` : undefined,
+    aiOutput: debug && fallback.notes ? `Notes: ${fallback.notes}` : undefined,
     events: fallback.events,
     debug: existingDebug
       ? {
