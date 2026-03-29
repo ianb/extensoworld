@@ -46,19 +46,29 @@ function handlerVars(context: VerbContext, createLib: LibFactory): Record<string
 function buildCheck(code: string, createLib: LibFactory): (context: VerbContext) => CheckResult {
   const fn = buildSandboxedFunction(code);
   return (context: VerbContext): CheckResult => {
-    const result = fn(handlerVars(context, createLib));
-    return { applies: !!result };
+    try {
+      const result = fn(handlerVars(context, createLib));
+      return { applies: !!result };
+    } catch (err: unknown) {
+      console.error(`[handler-eval] Check code threw: ${err instanceof Error ? err.message : err}`);
+      return { applies: false };
+    }
   };
 }
 
 function buildVeto(code: string, createLib: LibFactory): (context: VerbContext) => VetoResult {
   const fn = buildSandboxedFunction(code);
   return (context: VerbContext): VetoResult => {
-    const result = fn(handlerVars(context, createLib));
-    if (typeof result === "string") {
-      return { blocked: true, output: result };
+    try {
+      const result = fn(handlerVars(context, createLib));
+      if (typeof result === "string") {
+        return { blocked: true, output: result };
+      }
+      return { blocked: false };
+    } catch (err: unknown) {
+      console.error(`[handler-eval] Veto code threw: ${err instanceof Error ? err.message : err}`);
+      return { blocked: false };
     }
-    return { blocked: false };
   };
 }
 
@@ -68,7 +78,14 @@ function buildPerform(
 ): (context: VerbContext) => PerformResult {
   const fn = buildSandboxedFunction(code);
   return (context: VerbContext): PerformResult => {
-    const result = fn(handlerVars(context, createLib)) as PerformResult;
+    let result;
+    try {
+      result = fn(handlerVars(context, createLib)) as PerformResult;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[handler-eval] Handler code threw: ${msg}`);
+      return { output: "{!Something went wrong. The action fizzles.!}", events: [] };
+    }
     if (!result || typeof result.output !== "string") {
       return { output: "Something strange happens, but nothing changes.", events: [] };
     }
