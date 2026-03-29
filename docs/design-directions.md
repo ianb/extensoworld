@@ -314,7 +314,7 @@ Based on effort vs. impact:
 2. ~~**Entity secrets** (#8)~~ — **Done.** `secret` property added, generated during creation, consumed in verb fallback, conversations, and scenery. Backfilled on existing game content.
 3. ~~**Better parse failures** (#6)~~ — **Done.** Parse breakdown and allowed forms now shown on resolution failures.
 4. ~~**Affordance-oriented descriptions** (#7)~~ — **Done.** Creation prompts and schemas now steer descriptions toward interactive details.
-5. **Nearby entity context** (#1) — Medium effort. Makes AI generation context-aware, creates a connected world. Combines powerfully with secrets.
+5. ~~**Nearby entity context** (#1)~~ — **Done.** Room and entity creation prompts now include sampled entities from current room, adjacent rooms, and inventory — with secrets shown.
 6. ~~**Use X with Y guidance** (#2)~~ — **Done.** Verb fallback prompt now documents `indirect` variable, adds ditransitive code example, and steers AI toward mechanical outcomes for combinations.
 7. ~~**Room prompts with secrets** (#4)~~ — **Done.** Secrets backfilled on existing game content, creation prompt guidance added for both worlds.
 8. **Richer properties** (#3) — Needs per-world design work. Creates interaction vocabulary.

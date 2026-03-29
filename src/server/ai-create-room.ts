@@ -9,6 +9,7 @@ import {
   collectTags,
   filterKnownProperties,
   reverseDirection,
+  buildNearbyContext,
 } from "./ai-prompt-helpers.js";
 import { composeCreatePrompt } from "./ai-prompts.js";
 import { buildRoomSchema } from "./ai-create-room-schema.js";
@@ -39,7 +40,7 @@ function describeExitForLlm(entity: Entity): string {
 
 function buildPrompt(
   store: EntityStore,
-  { exit, sourceRoom }: { exit: Entity; sourceRoom: Entity },
+  { exit, sourceRoom, playerId }: { exit: Entity; sourceRoom: Entity; playerId: string },
 ): string {
   const parts: string[] = [];
   const intent = (exit.properties["destinationIntent"] as string) || "unknown destination";
@@ -57,6 +58,8 @@ function buildPrompt(
       `<source-room-exits>\n${sourceExits.map(describeExitForLlm).join("\n")}\n</source-room-exits>`,
     );
   }
+  const nearby = buildNearbyContext(store, { room: sourceRoom, playerId });
+  if (nearby) parts.push(nearby);
   parts.push(`<available-properties>\n${describeProperties(store)}\n</available-properties>`);
   parts.push(`<existing-tags>\n${collectTags(store).join(", ")}\n</existing-tags>`);
   return parts.join("\n\n");
@@ -113,6 +116,7 @@ export async function handleAiCreateRoom(
     exit,
     sourceRoom,
     gameId,
+    playerId,
     prompts,
     debug,
     authoring,
@@ -120,13 +124,14 @@ export async function handleAiCreateRoom(
     exit: Entity;
     sourceRoom: Entity;
     gameId: string;
+    playerId: string;
     prompts?: GamePrompts;
     debug?: boolean;
     authoring?: AuthoringInfo;
   },
 ): Promise<AiCreateRoomResult> {
   const systemPrompt = buildSystemPrompt({ prompts, room: sourceRoom, store });
-  const prompt = buildPrompt(store, { exit, sourceRoom });
+  const prompt = buildPrompt(store, { exit, sourceRoom, playerId });
   const direction = (exit.properties["direction"] as string) || "unknown";
   console.log("[ai-create-room] Materializing room via:", direction);
   const startTime = Date.now();

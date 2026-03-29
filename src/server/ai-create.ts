@@ -3,7 +3,12 @@ import { z } from "zod";
 import type { EntityStore, Entity } from "../core/entity.js";
 import type { GamePrompts } from "../core/game-data.js";
 import { getLlm, getLlmProviderOptions } from "./llm.js";
-import { describeProperties, collectTags, buildPropertiesSchema } from "./ai-prompt-helpers.js";
+import {
+  describeProperties,
+  collectTags,
+  buildPropertiesSchema,
+  buildNearbyContext,
+} from "./ai-prompt-helpers.js";
 import { composeCreatePrompt } from "./ai-prompts.js";
 import { getStorage } from "./storage-instance.js";
 import type { AuthoringInfo } from "./storage.js";
@@ -78,7 +83,7 @@ function describeEntityForLlm(entity: Entity): string {
 
 function buildPrompt(
   store: EntityStore,
-  { description, room }: { description: string; room: Entity },
+  { description, room, playerId }: { description: string; room: Entity; playerId: string },
 ): string {
   const parts: string[] = [];
 
@@ -94,6 +99,9 @@ function buildPrompt(
   if (items.length > 0) {
     parts.push(`<room-contents>\n${items.map(describeEntityForLlm).join("\n")}\n</room-contents>`);
   }
+
+  const nearby = buildNearbyContext(store, { room, playerId });
+  if (nearby) parts.push(nearby);
 
   parts.push(`<available-properties>\n${describeProperties(store)}\n</available-properties>`);
   parts.push(`<existing-tags>\n${collectTags(store).join(", ")}\n</existing-tags>`);
@@ -143,6 +151,7 @@ export async function handleAiCreate(
     description,
     room,
     gameId,
+    playerId,
     prompts,
     debug,
     authoring,
@@ -150,13 +159,14 @@ export async function handleAiCreate(
     description: string;
     room: Entity;
     gameId: string;
+    playerId: string;
     prompts?: GamePrompts;
     debug?: boolean;
     authoring?: AuthoringInfo;
   },
 ): Promise<AiCreateResult> {
   const systemPrompt = buildCreateSystemPrompt({ prompts, room, store });
-  const prompt = buildPrompt(store, { description, room });
+  const prompt = buildPrompt(store, { description, room, playerId });
 
   console.log("[ai-create] Creating:", description);
   const startTime = Date.now();

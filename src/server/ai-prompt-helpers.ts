@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { EntityStore } from "../core/entity.js";
+import type { Entity, EntityStore } from "../core/entity.js";
 import type { JSONSchema7 } from "../core/json-schema.js";
 import type { PropertyDefinition } from "../core/properties.js";
 
@@ -127,4 +127,102 @@ export function collectTags(store: EntityStore): string[] {
     }
   }
   return Array.from(tags).toSorted();
+}
+
+// --- Nearby entity context for AI prompts ---
+
+const SKIP_TAGS = new Set(["exit", "player", "region"]);
+const HIDDEN_PROPS = new Set(["location", "aliases", "aiPrompt", "scenery", "shortDescription"]);
+
+function isInteresting(entity: Entity): boolean {
+  for (const tag of entity.tags) {
+    if (SKIP_TAGS.has(tag)) return false;
+  }
+  return true;
+}
+
+function describeEntityDetail(entity: Entity): string {
+  const name = (entity.properties["name"] as string) || entity.id;
+  const tags = Array.from(entity.tags).join(", ");
+  const desc = (entity.properties["description"] as string) || "";
+  const secret = (entity.properties["secret"] as string) || "";
+  const lines = [`- ${name} [${tags}]`];
+  if (desc) lines.push(`  ${desc}`);
+  // Include notable properties (skip hidden/boring ones)
+  const props: string[] = [];
+  for (const [key, value] of Object.entries(entity.properties)) {
+    if (HIDDEN_PROPS.has(key)) continue;
+    if (key === "name" || key === "description" || key === "secret") continue;
+    if (value === false || value === 0 || value === undefined) continue;
+    props.push(`${key}: ${JSON.stringify(value)}`);
+  }
+  if (props.length > 0) lines.push(`  Properties: ${props.join(", ")}`);
+  if (secret) lines.push(`  Secret: ${secret}`);
+  return lines.join("\n");
+}
+
+function sample<T>(arr: T[], count: number): T[] {
+  if (arr.length <= count) return arr;
+  const shuffled = [...arr];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i]!, shuffled[j]!] = [shuffled[j]!, shuffled[i]!];
+  }
+  return shuffled.slice(0, count);
+}
+
+/**
+ * Build a prompt section describing the current room, adjacent rooms,
+ * and a random sample of entities from each — including secrets.
+ */
+export function buildNearbyContext(
+  store: EntityStore,
+  { room, playerId }: { room: Entity; playerId: string },
+): string {
+  const sections: string[] = [];
+
+  // Current room entities (sample 2)
+  const roomContents = store.getContents(room.id).filter(isInteresting);
+  if (roomContents.length > 0) {
+    const sampled = sample(roomContents, 2);
+    const roomName = (room.properties["name"] as string) || room.id;
+    sections.push(`Current room (${roomName}):\n${sampled.map(describeEntityDetail).join("\n\n")}`);
+  }
+
+  // Adjacent rooms via exits (sample 2 entities per room, max 3 rooms)
+  const exits = store.getContents(room.id).filter((e) => e.tags.has("exit"));
+  const adjacentRooms: Array<{ room: Entity; entities: Entity[] }> = [];
+  for (const exit of exits) {
+    const destId = exit.properties["destination"] as string | undefined;
+    if (!destId || !store.has(destId)) continue;
+    const dest = store.get(destId);
+    const contents = store.getContents(destId).filter(isInteresting);
+    if (contents.length > 0) {
+      adjacentRooms.push({ room: dest, entities: contents });
+    }
+  }
+  const sampledRooms = sample(adjacentRooms, 3);
+  for (const adj of sampledRooms) {
+    const sampled = sample(adj.entities, 2);
+    const adjName = (adj.room.properties["name"] as string) || adj.room.id;
+    sections.push(`Adjacent (${adjName}):\n${sampled.map(describeEntityDetail).join("\n\n")}`);
+  }
+
+  // Player inventory (sample 2)
+  const inventory = store.getContents(playerId).filter(isInteresting);
+  if (inventory.length > 0) {
+    const sampled = sample(inventory, 2);
+    sections.push(`Carrying:\n${sampled.map(describeEntityDetail).join("\n\n")}`);
+  }
+
+  if (sections.length === 0) return "";
+
+  return `<nearby-entities>
+Entities in the current room, adjacent rooms, and player inventory.
+You may create things that relate to or complement these, but don't have to.
+These are shown for context — do not reference them by name in descriptions
+unless there is a natural reason.
+
+${sections.join("\n\n")}
+</nearby-entities>`;
 }
