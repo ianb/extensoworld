@@ -125,7 +125,7 @@ export function defineBaseProperties(registry: PropertyRegistry): void {
     },
     {
       name: "scenery",
-      description: "Cached scenery descriptions for atmospheric details in a room",
+      description: "Scenery descriptions for atmospheric details in a room",
       schema: { type: "array" },
     },
     {

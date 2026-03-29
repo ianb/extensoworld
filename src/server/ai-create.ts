@@ -212,7 +212,7 @@ export async function handleAiCreate(
     authoring,
   });
 
-  // Remove any scenery cache entries that match the new entity's name/aliases
+  // Remove any scenery entries that match the new entity's name/aliases
   removeMatchingScenery(store, { room, name: response.name, aliases: response.aliases });
 
   const debugInfo: AiCreateDebugInfo | undefined = debug

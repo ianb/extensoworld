@@ -5,7 +5,7 @@ import { getPlayerRoom } from "../core/world.js";
 import {
   isSceneryWord,
   isExamineVerb,
-  getCachedScenery,
+  getStoredScenery,
   generateSceneryDescription,
 } from "./ai-scenery.js";
 import { getStorage } from "./storage-instance.js";
@@ -41,16 +41,16 @@ export async function handleSceneryCheck(
     return null;
   }
 
-  // Non-examine verbs: return cached rejection or generic one
+  // Non-examine verbs: return stored rejection or generic one
   if (!isExamineVerb(verb)) {
-    const cached = getCachedScenery(room, objectName);
-    if (cached) {
-      return { output: `{!${cached.rejection}!}` };
+    const stored = getStoredScenery(room, objectName);
+    if (stored) {
+      return { output: `{!${stored.rejection}!}` };
     }
     return { output: `{!You can't do that with the ${objectName}.!}` };
   }
 
-  // Examine: generate or return cached description
+  // Examine: generate or return stored description
   const result = await generateSceneryDescription(game.store, {
     word: objectName,
     room,

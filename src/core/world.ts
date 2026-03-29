@@ -3,6 +3,7 @@ import type { VerbContext, VerbRegistry, ResolvedCommand, WorldEvent } from "./v
 import { parseCommand, resolveCommand } from "./verbs.js";
 import { SYSTEM_VERBS } from "./verb-types.js";
 import { describeParsed, describeResolved } from "./debug-helpers.js";
+import type { ParsedCommand } from "./verb-types.js";
 import { tryMovement, getPlayer, getPlayerRoom } from "./movement.js";
 import type { UnresolvedExitContext } from "./movement.js";
 
@@ -99,6 +100,19 @@ function dispatchEncounters(
   return { outputs: allOutputs, events: allEvents };
 }
 
+const FORMS_HINT =
+  "Commands: verb object (take lamp), verb prep object (look at door), verb object prep object (put key in chest)";
+
+/** Show the player how their input was parsed, so mis-parses are obvious */
+function showParse(parsed: ParsedCommand): string {
+  if (parsed.form === "intransitive") return `${parsed.verb}`;
+  if (parsed.form === "transitive") return `${parsed.verb} [${parsed.object}]`;
+  if (parsed.form === "prepositional") {
+    return `${parsed.verb} ${parsed.prep} [${parsed.object}]`;
+  }
+  return `${parsed.verb} [${parsed.object}] ${parsed.prep} [${parsed.indirect}]`;
+}
+
 export function processCommand(
   store: EntityStore,
   { input, verbs, debug }: { input: string; verbs: VerbRegistry; debug?: boolean },
@@ -141,7 +155,7 @@ export function processCommand(
   const parsed = parseCommand(input);
   if (!parsed) {
     return {
-      output: `{!I don't understand "${input}". Type "help" for commands.!}`,
+      output: `{!I don't understand "${input}". ${FORMS_HINT}!}`,
       events: [],
       debug: debug ? { parse: input, outcome: "unparseable" } : undefined,
     };
@@ -158,8 +172,12 @@ export function processCommand(
         : parsed.form === "ditransitive"
           ? parsed.object
           : undefined;
+    // Annotate the resolution failure with parse info so the player
+    // can see how their input was interpreted
+    const parseInfo =
+      parsed.form !== "intransitive" ? `\n{!Parsed as: ${showParse(parsed)}\n${FORMS_HINT}!}` : "";
     return {
-      output: resolved,
+      output: resolved + parseInfo,
       events: [],
       debug: debug ? { parse: describeParsed(parsed), outcome: "resolution-failed" } : undefined,
       unresolvedObject: objectName ? { verb: parsed.verb, objectName } : undefined,
@@ -211,7 +229,7 @@ export function processCommand(
   }
 
   return {
-    output: `{!I don't know how to "${input}". Type "help" for commands.!}`,
+    output: `{!I don't know how to "${input}". ${FORMS_HINT}!}`,
     events: [],
     debug: debug ? { parse: describeParsed(parsed), outcome: "unhandled" } : undefined,
     unhandled: { command: resolved, player, room },

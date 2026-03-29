@@ -125,6 +125,7 @@
 
   /* The Aaru: dark sci-fi generation ship */
   [data-theme="aaru"] body {
+    font-size: 1.05rem;
     letter-spacing: 0.03em;
     line-height: 1.7;
   }

@@ -5,7 +5,7 @@ import type { GamePrompts } from "../core/game-data.js";
 import { getLlm, getLlmProviderOptions } from "./llm.js";
 import { composeVerbPrompt } from "./ai-prompts.js";
 
-/** Cached scenery descriptions stored on the room entity */
+/** Scenery descriptions stored on the room entity */
 export interface SceneryEntry {
   word: string;
   description: string;
@@ -112,8 +112,8 @@ export function isExamineVerb(verb: string): boolean {
   return EXAMINE_VERBS.has(verb);
 }
 
-/** Get cached scenery entry for a word, if it exists */
-export function getCachedScenery(room: Entity, word: string): SceneryEntry | null {
+/** Get stored scenery entry for a word, if it exists */
+export function getStoredScenery(room: Entity, word: string): SceneryEntry | null {
   const scenery = room.properties["scenery"] as SceneryEntry[] | undefined;
   if (!scenery) return null;
   const lower = word.toLowerCase();
@@ -134,7 +134,7 @@ export function removeMatchingScenery(
   }
 }
 
-/** Generate and cache a scenery description via AI */
+/** Generate and store a scenery description on the room entity */
 export async function generateSceneryDescription(
   store: EntityStore,
   {
@@ -156,9 +156,9 @@ export async function generateSceneryDescription(
     durationMs: number;
   };
 }> {
-  // Check cache first
-  const cached = getCachedScenery(room, word);
-  if (cached) return { entry: cached };
+  // Return existing entry if already generated
+  const existing = getStoredScenery(room, word);
+  if (existing) return { entry: existing };
 
   const systemPrompt = buildSystemPrompt({ room, store, prompts });
   const prompt = buildPrompt({ word, room });
@@ -183,11 +183,11 @@ export async function generateSceneryDescription(
     rejection: result.object.rejection,
   };
 
-  // Cache on the room entity
-  const existing = (room.properties["scenery"] as SceneryEntry[]) || [];
+  // Store on the room entity
+  const prior = (room.properties["scenery"] as SceneryEntry[]) || [];
   store.setProperty(room.id, {
     name: "scenery",
-    value: [...existing, entry],
+    value: [...prior, entry],
   });
 
   return {
