@@ -10,6 +10,9 @@ const ROOM_EXCLUDED = [
   "direction",
   "destination",
   "destinationIntent",
+  "gridX",
+  "gridY",
+  "gridZ",
 ];
 
 export function buildRoomSchema(store: EntityStore) {
@@ -45,12 +48,23 @@ export function buildRoomSchema(store: EntityStore) {
             description: z.string(),
             destinationIntent: z
               .string()
-              .describe("What this exit should lead to when materialized."),
+              .optional()
+              .describe(
+                "What this exit should lead to when materialized. Omit if using connectTo.",
+              ),
+            connectTo: z
+              .string()
+              .optional()
+              .describe(
+                "ID of an existing adjacent room to connect to instead of creating an unresolved exit.",
+              ),
             aliases: z.array(z.string()),
             properties: propsSchema,
           }),
         )
-        .describe("Additional unresolved exits (not the return exit). 0-2 exits."),
+        .describe(
+          "Additional exits (not the return exit). 0-2 exits. Use connectTo OR destinationIntent.",
+        ),
       contents: z
         .array(
           z.object({

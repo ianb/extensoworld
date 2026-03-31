@@ -115,6 +115,36 @@ export function reverseDirection(direction: string): string {
   return REVERSE_DIRECTIONS[direction.toLowerCase()] || "back";
 }
 
+/** 3D grid offsets for each cardinal/diagonal/vertical direction: [dx, dy, dz] */
+const DIRECTION_OFFSETS_3D: Record<string, [number, number, number]> = {
+  north: [0, -1, 0],
+  south: [0, 1, 0],
+  east: [1, 0, 0],
+  west: [-1, 0, 0],
+  northeast: [1, -1, 0],
+  northwest: [-1, -1, 0],
+  southeast: [1, 1, 0],
+  southwest: [-1, 1, 0],
+  up: [0, 0, 1],
+  down: [0, 0, -1],
+};
+
+export interface GridCoords {
+  x: number;
+  y: number;
+  z: number;
+}
+
+/** Compute the grid coordinates for a room reached by traveling `direction` from `source`. */
+export function computeRoomCoordinates(source: Entity, direction: string): GridCoords | null {
+  const offset = DIRECTION_OFFSETS_3D[direction.toLowerCase()];
+  if (!offset) return null;
+  const sx = (source.properties["gridX"] as number) || 0;
+  const sy = (source.properties["gridY"] as number) || 0;
+  const sz = (source.properties["gridZ"] as number) || 0;
+  return { x: sx + offset[0], y: sy + offset[1], z: sz + offset[2] };
+}
+
 export function collectTags(store: EntityStore): string[] {
   const tags = new Set<string>();
   const propertyNames = new Set(Object.keys(store.registry.definitions));
@@ -225,4 +255,51 @@ unless there is a natural reason.
 
 ${sections.join("\n\n")}
 </nearby-entities>`;
+}
+
+/**
+ * Find rooms at specific grid coordinates.
+ */
+function findRoomsAtCoords(store: EntityStore, coords: GridCoords): Entity[] {
+  return store.findByTag("room").filter((r) => {
+    const rx = (r.properties["gridX"] as number) || 0;
+    const ry = (r.properties["gridY"] as number) || 0;
+    const rz = (r.properties["gridZ"] as number) || 0;
+    return rx === coords.x && ry === coords.y && rz === coords.z;
+  });
+}
+
+/**
+ * Build a prompt section describing existing rooms adjacent to the given coordinates.
+ * This lets the AI know which rooms are nearby so it can connect exits to them.
+ */
+export function buildAdjacentRoomContext(store: EntityStore, center: GridCoords): string {
+  const entries: string[] = [];
+  for (const [dir, offset] of Object.entries(DIRECTION_OFFSETS_3D)) {
+    const adjCoords = { x: center.x + offset[0], y: center.y + offset[1], z: center.z + offset[2] };
+    const rooms = findRoomsAtCoords(store, adjCoords);
+    for (const room of rooms) {
+      const name = (room.properties["name"] as string) || room.id;
+      const desc = (room.properties["description"] as string) || "";
+      const truncDesc = desc.length > 120 ? desc.slice(0, 117) + "..." : desc;
+      // Check if this room has an unresolved exit pointing back toward center
+      const roomExits = store.getContents(room.id).filter((e) => e.tags.has("exit"));
+      const reverseDir = REVERSE_DIRECTIONS[dir];
+      const hasBackExit = roomExits.some((e) => {
+        const eDir = (e.properties["direction"] as string) || "";
+        return eDir.toLowerCase() === reverseDir && e.properties["destinationIntent"];
+      });
+      const backNote = hasBackExit ? " (has unresolved exit pointing back this way)" : "";
+      entries.push(`- ${dir}: ${name} (${room.id})${backNote}\n  ${truncDesc}`);
+    }
+  }
+  if (entries.length === 0) return "";
+  return `<adjacent-rooms>
+Existing rooms adjacent to this room's grid position. You may connect an exit
+to one of these rooms by setting connectTo to its ID instead of destinationIntent.
+Only connect when it makes narrative sense (corridors circling back, shortcuts,
+alternate routes). Don't force connections.
+
+${entries.join("\n")}
+</adjacent-rooms>`;
 }
