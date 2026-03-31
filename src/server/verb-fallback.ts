@@ -11,6 +11,7 @@ import { executeAndSave, buildPerformCode } from "./handler-execute.js";
 import type { HandlerLib } from "../core/handler-lib.js";
 import type { GamePrompts } from "../core/game-data.js";
 import { buildSystemPrompt, buildFallbackPrompt, describeCommand } from "./verb-fallback-prompt.js";
+import { recordAiCall } from "./ai-quota.js";
 
 export interface FallbackDebugInfo {
   systemPrompt: string;
@@ -122,6 +123,7 @@ export async function handleVerbFallback(
   });
 
   const durationMs = Date.now() - startTime;
+  if (authoring) await recordAiCall(authoring.createdBy, "verb-fallback");
   const response = result.object;
 
   console.log(

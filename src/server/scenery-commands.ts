@@ -12,6 +12,7 @@ import {
 } from "./ai-scenery.js";
 import { getStorage } from "./storage-instance.js";
 import type { AuthoringInfo } from "./storage.js";
+import { recordAiCall } from "./ai-quota.js";
 
 interface SceneryResponse {
   output: string;
@@ -118,6 +119,11 @@ export async function handleSceneryCheck(
     recentOutput: scenerySource.source === "output" ? scenerySource.outputText : undefined,
     prompts,
   });
+
+  // Record AI usage if this was a new generation (not cached)
+  if (result.debug && authoring) {
+    await recordAiCall(authoring.createdBy, "scenery");
+  }
 
   // Store on the source entity if it's item/output scenery, otherwise on room
   const storeOnEntity = sourceEntity || room;

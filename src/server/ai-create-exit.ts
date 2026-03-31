@@ -7,6 +7,7 @@ import { describeProperties, collectTags, buildPropertiesSchema } from "./ai-pro
 import { composeCreatePrompt } from "./ai-prompts.js";
 import { getStorage } from "./storage-instance.js";
 import type { AuthoringInfo } from "./storage.js";
+import { recordAiCall } from "./ai-quota.js";
 
 export interface AiCreateExitResult {
   output: string;
@@ -166,6 +167,7 @@ export async function handleAiCreateExit(
   });
 
   const durationMs = Date.now() - startTime;
+  if (authoring) await recordAiCall(authoring.createdBy, "ai-create-exit");
   const response = result.object;
 
   console.log(

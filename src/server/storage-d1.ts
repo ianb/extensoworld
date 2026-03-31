@@ -274,4 +274,21 @@ export class D1Storage implements RuntimeStorage {
       .bind(new Date().toISOString(), userId)
       .run();
   }
+
+  // --- AI Usage Quota ---
+
+  async recordAiUsage(userId: string, callType: string): Promise<void> {
+    await this.db
+      .prepare("INSERT INTO ai_usage (user_id, call_type, created_at) VALUES (?, ?, ?)")
+      .bind(userId, callType, new Date().toISOString())
+      .run();
+  }
+
+  async countAiUsage(userId: string, since: string): Promise<number> {
+    const result = await this.db
+      .prepare("SELECT COUNT(*) as cnt FROM ai_usage WHERE user_id = ? AND created_at > ?")
+      .bind(userId, since)
+      .first<number>("cnt");
+    return result || 0;
+  }
 }

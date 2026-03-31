@@ -13,6 +13,7 @@ import { composeCreatePrompt } from "./ai-prompts.js";
 import { getStorage } from "./storage-instance.js";
 import type { AuthoringInfo } from "./storage.js";
 import { removeMatchingScenery } from "./ai-scenery.js";
+import { recordAiCall } from "./ai-quota.js";
 
 export interface AiCreateResult {
   output: string;
@@ -182,6 +183,7 @@ export async function handleAiCreate(
   });
 
   const durationMs = Date.now() - startTime;
+  if (authoring) await recordAiCall(authoring.createdBy, "ai-create");
   const response = result.object;
 
   console.log(`[ai-create] Created: ${response.name} (${durationMs}ms)`);

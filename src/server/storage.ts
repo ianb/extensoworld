@@ -95,4 +95,8 @@ export interface RuntimeStorage {
   hasAnyUsers(): Promise<boolean>;
   createUser(record: UserRecord): Promise<void>;
   updateLastLogin(userId: string): Promise<void>;
+
+  // --- AI Usage Quota ---
+  recordAiUsage(userId: string, callType: string): Promise<void>;
+  countAiUsage(userId: string, since: string): Promise<number>;
 }

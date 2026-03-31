@@ -23,6 +23,7 @@ import {
   persistEntity,
 } from "./ai-room-grid.js";
 import type { AuthoringInfo } from "./storage.js";
+import { recordAiCall } from "./ai-quota.js";
 
 export interface AiCreateRoomDebugInfo {
   systemPrompt: string;
@@ -140,6 +141,7 @@ export async function handleAiCreateRoom(
     abortSignal: getLlmAbortSignal(),
   });
   const durationMs = Date.now() - startTime;
+  if (authoring) await recordAiCall(authoring.createdBy, "room");
   const response = result.object;
   const roomData = response.room;
   console.log(`[ai-create-room] Created: ${roomData.name} (${durationMs}ms)`);

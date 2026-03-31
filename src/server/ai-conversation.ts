@@ -7,6 +7,7 @@ import { getLlm, getLlmProviderOptions, getLlmAbortSignal } from "./llm.js";
 import { composeConversationPrompt } from "./ai-prompts.js";
 import { getStorage } from "./storage-instance.js";
 import type { AuthoringInfo, SessionKey } from "./storage.js";
+import { recordAiCall } from "./ai-quota.js";
 
 /** Max word entries before a conversation auto-closes to AI expansion */
 export const MAX_CONVERSATION_WORDS = 30;
@@ -190,6 +191,7 @@ export async function handleAiConversationFallback(
   });
 
   const durationMs = Date.now() - startTime;
+  if (authoring) await recordAiCall(authoring.createdBy, "conversation");
   const response = result.object;
   console.log(`[ai-conversation] Decision: ${response.decision} (${durationMs}ms)`);
 

@@ -7,6 +7,7 @@ import { handleConversationWord, checkForConversationStart } from "./conversatio
 import { handleSceneryCheck } from "./scenery-commands.js";
 import { handleSpecialCommand } from "./special-commands.js";
 import { RecentOutputBuffer } from "./recent-output.js";
+import { checkAiQuota } from "./ai-quota.js";
 
 export interface CommandInput {
   gameId: string;
@@ -86,7 +87,7 @@ export async function executeCommand(
 ): Promise<CommandResult> {
   const trimmed = input.text.trim();
   const session: SessionKey = { gameId: input.gameId, userId: input.userId };
-  const hasAiRole = !input.roles || input.roles.includes("ai");
+  let hasAiRole = !input.roles || input.roles.includes("ai");
   // Ensure recent output buffer exists on game instance
   if (!game.recentOutputs) {
     game.recentOutputs = new RecentOutputBuffer(3);
@@ -104,6 +105,14 @@ export async function executeCommand(
     hasAiRole,
     authoring,
   };
+
+  // Check AI quota — disable AI for this request if over quota
+  if (hasAiRole) {
+    const quotaMsg = await checkAiQuota(input.userId, input.roles);
+    if (quotaMsg) {
+      hasAiRole = false;
+    }
+  }
 
   // Conversation mode: route single-word input to conversation engine
   if (game.conversationState) {

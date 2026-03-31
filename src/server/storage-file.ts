@@ -189,4 +189,14 @@ export class FileStorage implements RuntimeStorage {
     });
     writeFileSync(filePath, updated.join("\n") + "\n");
   }
+
+  // --- AI Usage Quota (no-op for local dev) ---
+
+  async recordAiUsage(_userId: string, _callType: string): Promise<void> {
+    // No quota enforcement in local dev
+  }
+
+  async countAiUsage(_userId: string, _since: string): Promise<number> {
+    return 0;
+  }
 }
