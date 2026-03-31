@@ -137,16 +137,20 @@ export class HandlerLib {
 
   drop(obj: Entity): PerformResult {
     const ref = this.ref(obj);
-    return {
-      output: `You drop the ${ref}.`,
-      events: [
-        this.moveEvent(obj.id, {
-          to: this.room.id,
-          from: this.player.id,
-          description: `Dropped ${ref}`,
-        }),
-      ],
-    };
+    const events: WorldEvent[] = [];
+    if (obj.properties["worn"]) {
+      events.push(
+        this.setEvent(obj.id, { property: "worn", value: false, description: `Removed ${ref}` }),
+      );
+    }
+    events.push(
+      this.moveEvent(obj.id, {
+        to: this.room.id,
+        from: this.player.id,
+        description: `Dropped ${ref}`,
+      }),
+    );
+    return { output: `You drop the ${ref}.`, events };
   }
 
   showInventory(): PerformResult {
@@ -289,16 +293,6 @@ export class HandlerLib {
       );
     }
     return { output: `You put on the ${ref}.`, events };
-  }
-
-  unwear(obj: Entity): PerformResult {
-    const ref = this.ref(obj);
-    return {
-      output: `You take off the ${ref}.`,
-      events: [
-        this.setEvent(obj.id, { property: "worn", value: false, description: `Removed ${ref}` }),
-      ],
-    };
   }
 
   showHelp(): PerformResult {
