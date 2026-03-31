@@ -59,6 +59,14 @@ export function getLlm(): LanguageModel {
   return cachedModel;
 }
 
+/** Default timeout (ms) for AI API calls */
+export const LLM_TIMEOUT_MS = 45_000;
+
+/** Create an AbortSignal that fires after the default LLM timeout */
+export function getLlmAbortSignal(): AbortSignal {
+  return AbortSignal.timeout(LLM_TIMEOUT_MS);
+}
+
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 type ProviderOpts = Record<string, Record<string, JsonValue>>;
 

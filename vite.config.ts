@@ -10,9 +10,15 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    watch: {
+      ignored: ["**/data/**", "**/userdata/**"],
+    },
     proxy: {
       "/trpc": "http://localhost:3001",
-      "/api": "http://localhost:3001",
+      "/api": {
+        target: "http://localhost:3001",
+        timeout: 120_000, // AI calls can take 30-60s
+      },
       "/auth": "http://localhost:3001",
     },
   },

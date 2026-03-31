@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Entity, EntityStore } from "../core/entity.js";
 import type { ConversationState, WordEntry } from "../core/conversation.js";
 import type { GamePrompts } from "../core/game-data.js";
-import { getLlm, getLlmProviderOptions } from "./llm.js";
+import { getLlm, getLlmProviderOptions, getLlmAbortSignal } from "./llm.js";
 import { composeConversationPrompt } from "./ai-prompts.js";
 import { getStorage } from "./storage-instance.js";
 import type { AuthoringInfo, SessionKey } from "./storage.js";
@@ -186,6 +186,7 @@ export async function handleAiConversationFallback(
     system: systemPrompt,
     prompt,
     providerOptions: getLlmProviderOptions(),
+    abortSignal: getLlmAbortSignal(),
   });
 
   const durationMs = Date.now() - startTime;

@@ -2,7 +2,7 @@ import { generateObject } from "ai";
 import { z } from "zod";
 import type { EntityStore, Entity } from "../core/entity.js";
 import type { GamePrompts } from "../core/game-data.js";
-import { getLlm, getLlmProviderOptions } from "./llm.js";
+import { getLlm, getLlmProviderOptions, getLlmAbortSignal } from "./llm.js";
 import { describeProperties, collectTags, buildPropertiesSchema } from "./ai-prompt-helpers.js";
 import { composeCreatePrompt } from "./ai-prompts.js";
 import { getStorage } from "./storage-instance.js";
@@ -162,6 +162,7 @@ export async function handleAiCreateExit(
     system: systemPrompt,
     prompt,
     providerOptions: getLlmProviderOptions(),
+    abortSignal: getLlmAbortSignal(),
   });
 
   const durationMs = Date.now() - startTime;

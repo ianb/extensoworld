@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { EntityStore, Entity } from "../core/entity.js";
 import type { ResolvedCommand, VerbHandler, VerbContext, WorldEvent } from "../core/verb-types.js";
 import type { VerbRegistry } from "../core/verbs.js";
-import { getLlm, getLlmProviderOptions } from "./llm.js";
+import { getLlm, getLlmProviderOptions, getLlmAbortSignal } from "./llm.js";
 import type { AiHandlerRecord, AuthoringInfo } from "./storage.js";
 import { recordToHandler } from "./handler-convert.js";
 import { getStorage } from "./storage-instance.js";
@@ -118,6 +118,7 @@ export async function handleVerbFallback(
     system: systemPrompt,
     prompt,
     providerOptions: getLlmProviderOptions(),
+    abortSignal: getLlmAbortSignal(),
   });
 
   const durationMs = Date.now() - startTime;
@@ -211,6 +212,7 @@ export async function handleVerbFallback(
     system: systemPrompt,
     prompt: retryPrompt,
     providerOptions: getLlmProviderOptions(),
+    abortSignal: getLlmAbortSignal(),
   });
   const retryRecord: AiHandlerRecord = { ...record, perform: buildPerformCode(retryResp.object) };
   const retryExec = await executeAndSave(store, {

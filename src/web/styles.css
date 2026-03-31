@@ -43,7 +43,13 @@
 }
 
 @layer base {
-  h1, h2, h3, h4, h5, h6, .font-heading {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  .font-heading {
     font-family: var(--font-heading);
   }
 
@@ -54,40 +60,40 @@
     --th-font-heading: "Roboto Mono", ui-monospace, monospace;
 
     /* Surfaces */
-    --th-page: oklch(0.145 0.014 260);       /* gray-950 */
-    --th-surface: oklch(0.205 0.015 260);     /* gray-900 */
-    --th-input: oklch(0.269 0.015 260);       /* gray-800 */
+    --th-page: oklch(0.145 0.014 260); /* gray-950 */
+    --th-surface: oklch(0.205 0.015 260); /* gray-900 */
+    --th-input: oklch(0.269 0.015 260); /* gray-800 */
 
     /* Content */
-    --th-content: oklch(0.925 0.006 260);     /* gray-100 */
+    --th-content: oklch(0.925 0.006 260); /* gray-100 */
 
     /* Accent */
-    --th-accent: oklch(0.685 0.155 230);      /* sky-400 */
-    --th-accent-hover: oklch(0.750 0.130 230); /* sky-300 */
-    --th-accent-bold: oklch(0.500 0.155 230); /* sky-700 */
+    --th-accent: oklch(0.685 0.155 230); /* sky-400 */
+    --th-accent-hover: oklch(0.75 0.13 230); /* sky-300 */
+    --th-accent-bold: oklch(0.5 0.155 230); /* sky-700 */
 
     /* Game: conversation */
-    --th-convo: oklch(0.600 0.130 195);       /* cyan-400/500 area */
-    --th-convo-bg: oklch(0.200 0.040 195);    /* cyan-950 area */
+    --th-convo: oklch(0.6 0.13 195); /* cyan-400/500 area */
+    --th-convo-bg: oklch(0.2 0.04 195); /* cyan-950 area */
 
     /* Game: highlights */
-    --th-highlight-entity: oklch(0.730 0.150 85);  /* amber-400 */
-    --th-highlight-topic: oklch(0.680 0.130 195);  /* cyan-400 */
-    --th-highlight-direction: oklch(0.680 0.160 160); /* emerald-400 */
+    --th-highlight-entity: oklch(0.73 0.15 85); /* amber-400 */
+    --th-highlight-topic: oklch(0.68 0.13 195); /* cyan-400 */
+    --th-highlight-direction: oklch(0.68 0.16 160); /* emerald-400 */
 
     /* Game: AI */
-    --th-ai: oklch(0.650 0.165 300);          /* purple-400 */
+    --th-ai: oklch(0.65 0.165 300); /* purple-400 */
 
     /* Game: commands */
-    --th-command: oklch(0.580 0.200 25);      /* red-400 */
+    --th-command: oklch(0.58 0.2 25); /* red-400 */
 
     /* Semantic */
-    --th-danger: oklch(0.580 0.200 25);       /* red-400/500 */
-    --th-caution: oklch(0.680 0.170 85);      /* yellow-500 */
+    --th-danger: oklch(0.58 0.2 25); /* red-400/500 */
+    --th-caution: oklch(0.68 0.17 85); /* yellow-500 */
 
     /* Diff */
-    --th-added: oklch(0.650 0.200 145);       /* green-500 */
-    --th-removed: oklch(0.580 0.200 25);      /* red-500 */
+    --th-added: oklch(0.65 0.2 145); /* green-500 */
+    --th-removed: oklch(0.58 0.2 25); /* red-500 */
   }
 
   /* Colossal Cave: manila/brown retro feel, inspired by app icon */
@@ -96,31 +102,33 @@
     --th-font-mono: "Special Elite", cursive;
     --th-font-heading: "Special Elite", cursive;
 
-    --th-page: oklch(0.93 0.03 75);           /* manila/cream */
-    --th-surface: oklch(0.88 0.035 72);       /* slightly darker parchment */
-    --th-input: oklch(0.95 0.02 75);          /* lighter cream for inputs */
+    --th-page: oklch(0.93 0.03 75); /* manila/cream */
+    --th-surface: oklch(0.88 0.035 72); /* slightly darker parchment */
+    --th-input: oklch(0.95 0.02 75); /* lighter cream for inputs */
 
-    --th-content: oklch(0.18 0.05 50);        /* very dark brown — needs to stay readable at /25 opacity on light bg */
+    --th-content: oklch(
+      0.18 0.05 50
+    ); /* very dark brown — needs to stay readable at /25 opacity on light bg */
 
-    --th-accent: oklch(0.45 0.12 50);         /* rich brown (icon brown) */
-    --th-accent-hover: oklch(0.38 0.10 50);   /* darker brown on hover */
-    --th-accent-bold: oklch(0.45 0.12 50);    /* same rich brown for buttons */
+    --th-accent: oklch(0.45 0.12 50); /* rich brown (icon brown) */
+    --th-accent-hover: oklch(0.38 0.1 50); /* darker brown on hover */
+    --th-accent-bold: oklch(0.45 0.12 50); /* same rich brown for buttons */
 
-    --th-convo: oklch(0.40 0.08 160);         /* muted dark teal */
-    --th-convo-bg: oklch(0.90 0.03 160);      /* light teal tint */
+    --th-convo: oklch(0.4 0.08 160); /* muted dark teal */
+    --th-convo-bg: oklch(0.9 0.03 160); /* light teal tint */
 
-    --th-highlight-entity: oklch(0.45 0.14 50);  /* brown, matching accent */
-    --th-highlight-topic: oklch(0.40 0.08 160);  /* dark teal */
-    --th-highlight-direction: oklch(0.38 0.10 145); /* forest green */
+    --th-highlight-entity: oklch(0.45 0.14 50); /* brown, matching accent */
+    --th-highlight-topic: oklch(0.4 0.08 160); /* dark teal */
+    --th-highlight-direction: oklch(0.38 0.1 145); /* forest green */
 
-    --th-ai: oklch(0.45 0.10 300);            /* muted purple */
-    --th-command: oklch(0.45 0.15 25);        /* brick red */
+    --th-ai: oklch(0.45 0.1 300); /* muted purple */
+    --th-command: oklch(0.45 0.15 25); /* brick red */
 
-    --th-danger: oklch(0.45 0.18 25);         /* dark red */
-    --th-caution: oklch(0.50 0.12 85);        /* dark amber */
+    --th-danger: oklch(0.45 0.18 25); /* dark red */
+    --th-caution: oklch(0.5 0.12 85); /* dark amber */
 
-    --th-added: oklch(0.40 0.14 145);         /* dark green */
-    --th-removed: oklch(0.45 0.18 25);        /* dark red */
+    --th-added: oklch(0.4 0.14 145); /* dark green */
+    --th-removed: oklch(0.45 0.18 25); /* dark red */
   }
 
   /* The Aaru: dark sci-fi generation ship */
@@ -135,30 +143,30 @@
     --th-font-mono: "Electrolize", sans-serif;
     --th-font-heading: "Audiowide", sans-serif;
 
-    --th-page: oklch(0.12 0.02 260);          /* deep space blue-black */
-    --th-surface: oklch(0.17 0.025 255);      /* dark hull panel */
-    --th-input: oklch(0.22 0.02 250);         /* recessed panel */
+    --th-page: oklch(0.12 0.02 260); /* deep space blue-black */
+    --th-surface: oklch(0.17 0.025 255); /* dark hull panel */
+    --th-input: oklch(0.22 0.02 250); /* recessed panel */
 
-    --th-content: oklch(0.85 0.04 210);       /* cool blue-white display text */
+    --th-content: oklch(0.85 0.04 210); /* cool blue-white display text */
 
-    --th-accent: oklch(0.70 0.18 210);        /* bright cyan-blue */
-    --th-accent-hover: oklch(0.80 0.15 210);  /* lighter glow */
-    --th-accent-bold: oklch(0.50 0.18 220);   /* deep interface blue */
+    --th-accent: oklch(0.7 0.18 210); /* bright cyan-blue */
+    --th-accent-hover: oklch(0.8 0.15 210); /* lighter glow */
+    --th-accent-bold: oklch(0.5 0.18 220); /* deep interface blue */
 
-    --th-convo: oklch(0.65 0.15 180);         /* teal terminal */
-    --th-convo-bg: oklch(0.15 0.04 180);      /* dark teal panel */
+    --th-convo: oklch(0.65 0.15 180); /* teal terminal */
+    --th-convo-bg: oklch(0.15 0.04 180); /* dark teal panel */
 
-    --th-highlight-entity: oklch(0.75 0.15 90);  /* amber warning color */
-    --th-highlight-topic: oklch(0.70 0.15 180);  /* teal */
-    --th-highlight-direction: oklch(0.70 0.15 150); /* green nav marker */
+    --th-highlight-entity: oklch(0.75 0.15 90); /* amber warning color */
+    --th-highlight-topic: oklch(0.7 0.15 180); /* teal */
+    --th-highlight-direction: oklch(0.7 0.15 150); /* green nav marker */
 
-    --th-ai: oklch(0.65 0.18 290);            /* violet system process */
-    --th-command: oklch(0.65 0.18 30);         /* orange-red alert */
+    --th-ai: oklch(0.65 0.18 290); /* violet system process */
+    --th-command: oklch(0.65 0.18 30); /* orange-red alert */
 
-    --th-danger: oklch(0.60 0.22 30);         /* red alert */
-    --th-caution: oklch(0.75 0.16 90);        /* amber alert */
+    --th-danger: oklch(0.6 0.22 30); /* red alert */
+    --th-caution: oklch(0.75 0.16 90); /* amber alert */
 
-    --th-added: oklch(0.65 0.18 150);         /* green status */
-    --th-removed: oklch(0.60 0.22 30);        /* red status */
+    --th-added: oklch(0.65 0.18 150); /* green status */
+    --th-removed: oklch(0.6 0.22 30); /* red status */
   }
 }

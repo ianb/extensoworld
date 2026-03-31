@@ -57,6 +57,14 @@ async function initGame(session: SessionKey): Promise<GameInstance> {
   const aiEntities = await storage.loadAiEntities(session.gameId);
   applyAiEntities(aiEntities, instance.store);
   instance.store.snapshot();
+  // Mark the starting room as visited so the map includes it
+  const startPlayer = instance.store.findByTag("player")[0];
+  if (startPlayer) {
+    const startRoomId = startPlayer.properties["location"] as string;
+    if (startRoomId && instance.store.has(startRoomId)) {
+      instance.store.setProperty(startRoomId, { name: "visits", value: 1 });
+    }
+  }
   // Events are per-user
   const events = await storage.loadEvents(session);
   for (const entry of events) {
@@ -178,6 +186,30 @@ export const appRouter = router({
       const initial = game.store.getInitialState(input.id);
       return { current, initial };
     }),
+
+  mapData: authedProcedure.input(gameInput).query(async ({ input, ctx }) => {
+    const session = { gameId: input.gameId, userId: ctx.userId };
+    const game = await getOrCreateGame(session);
+    const store = game.store;
+    const players = store.findByTag("player");
+    const player = players[0];
+    const currentRoomId = player ? (player.properties["location"] as string) || "" : "";
+    const roomIds = store.findByTag("room").map((r) => r.id);
+    const rooms = roomIds.map((id) => {
+      const room = store.get(id);
+      const exits = store.getExits(id);
+      return {
+        id,
+        name: (room.properties["name"] as string) || id,
+        visits: (room.properties["visits"] as number) || 0,
+        exits: exits.map((e) => ({
+          direction: (e.properties["direction"] as string) || "",
+          destinationId: (e.properties["destination"] as string) || null,
+        })),
+      };
+    });
+    return { rooms, currentRoomId };
+  }),
 
   prompts: authedProcedure.input(gameInput).query(async ({ input, ctx }) => {
     const session = { gameId: input.gameId, userId: ctx.userId };

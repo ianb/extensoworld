@@ -34,10 +34,12 @@ export function WorldShell({
   gameId,
   onEntityClick,
   onCommandComplete,
+  mapButton,
 }: {
   gameId: string;
   onEntityClick?: (id: string) => void;
   onCommandComplete?: () => void;
+  mapButton?: React.ReactNode;
 }) {
   const [log, setLog] = useState<LogEntry[]>([]);
   const [input, setInput] = useState("");
@@ -107,8 +109,9 @@ export function WorldShell({
 
   return (
     <div className="flex h-full flex-col">
-      {canDebug ? (
-        <div className="flex items-center justify-end py-1">
+      <div className="flex items-center justify-end gap-2 py-1">
+        {mapButton}
+        {canDebug ? (
           <label className="flex cursor-pointer items-center gap-2 text-xs text-content/40">
             <input
               type="checkbox"
@@ -118,8 +121,8 @@ export function WorldShell({
             />
             Debug
           </label>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
       {conversationMode ? (
         <div className="flex items-center gap-2 rounded-t-lg border-x border-t border-convo/50 bg-convo-bg px-3 py-2 text-sm text-convo/80">
           <span className="font-bold">{conversationMode.npcName}</span>

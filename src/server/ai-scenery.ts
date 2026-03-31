@@ -2,7 +2,7 @@ import { generateObject } from "ai";
 import { z } from "zod";
 import type { Entity, EntityStore } from "../core/entity.js";
 import type { GamePrompts } from "../core/game-data.js";
-import { getLlm, getLlmProviderOptions } from "./llm.js";
+import { getLlm, getLlmProviderOptions, getLlmAbortSignal } from "./llm.js";
 import { composeVerbPrompt } from "./ai-prompts.js";
 
 /** Scenery descriptions stored on the room entity */
@@ -239,6 +239,7 @@ export async function generateSceneryDescription(
     system: systemPrompt,
     prompt,
     providerOptions: getLlmProviderOptions(),
+    abortSignal: getLlmAbortSignal(),
   });
 
   const durationMs = Date.now() - startTime;

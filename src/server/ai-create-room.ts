@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { EntityStore, Entity } from "../core/entity.js";
 import type { GamePrompts } from "../core/game-data.js";
 import type { WorldEvent } from "../core/verb-types.js";
-import { getLlm, getLlmProviderOptions } from "./llm.js";
+import { getLlm, getLlmProviderOptions, getLlmAbortSignal } from "./llm.js";
 import {
   describeProperties,
   collectTags,
@@ -142,6 +142,7 @@ export async function handleAiCreateRoom(
     system: systemPrompt,
     prompt,
     providerOptions: getLlmProviderOptions(),
+    abortSignal: getLlmAbortSignal(),
   });
   const durationMs = Date.now() - startTime;
   const response = result.object;

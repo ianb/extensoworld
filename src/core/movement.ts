@@ -73,6 +73,7 @@ export function tryMovement(store: EntityStore, input: string): MovementResult |
         direction,
         moved: false,
         events: [],
+        unresolvedExit: { exit, room, player: getPlayer(store), direction },
       };
     }
     const events: WorldEvent[] = [];
