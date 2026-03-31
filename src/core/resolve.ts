@@ -83,10 +83,16 @@ function preferHeld(matches: Entity[], playerId: string): Entity | null {
   return null;
 }
 
+const SELF_WORDS = new Set(["self", "myself", "me", "yourself"]);
+
 function resolveObject(
   name: string,
   { visible, playerId }: { visible: Entity[]; playerId: string },
 ): Entity | string {
+  if (SELF_WORDS.has(name.toLowerCase())) {
+    const player = visible.find((e) => e.id === playerId);
+    if (player) return player;
+  }
   const result = matchEntityByName(name, visible);
   if (result instanceof AmbiguousObjectError) {
     const held = preferHeld(result.matches, playerId);
