@@ -35,11 +35,13 @@ export function WorldShell({
   onEntityClick,
   onCommandComplete,
   mapButton,
+  aiThinkingMessages,
 }: {
   gameId: string;
   onEntityClick?: (id: string) => void;
   onCommandComplete?: () => void;
   mapButton?: React.ReactNode;
+  aiThinkingMessages?: string[] | null;
 }) {
   const [log, setLog] = useState<LogEntry[]>([]);
   const [input, setInput] = useState("");
@@ -149,7 +151,9 @@ export function WorldShell({
             }}
           />
         ))}
-        {loading ? <ThinkingIndicator phase={loadingPhase} /> : null}
+        {loading ? (
+          <ThinkingIndicator phase={loadingPhase} customMessages={aiThinkingMessages} />
+        ) : null}
         <div ref={logEndRef} />
       </div>
       <form
@@ -218,7 +222,27 @@ function LogEntryView({
   );
 }
 
-function ThinkingIndicator({ phase }: { phase: "thinking" | "ai" | null }) {
+const DEFAULT_AI_MESSAGES = [
+  "The world shifts and reshapes...",
+  "Something stirs in the unseen...",
+  "Reality bends to accommodate...",
+  "The story unfolds...",
+];
+
+let aiMessageCounter = 0;
+function pickFromMessages(messages: string[]): string {
+  const msg = messages[aiMessageCounter % messages.length]!;
+  aiMessageCounter++;
+  return msg;
+}
+
+function ThinkingIndicator({
+  phase,
+  customMessages,
+}: {
+  phase: "thinking" | "ai" | null;
+  customMessages?: string[] | null;
+}) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -228,8 +252,11 @@ function ThinkingIndicator({ phase }: { phase: "thinking" | "ai" | null }) {
 
   if (!visible && phase !== "ai") return null;
 
-  const text = phase === "ai" ? "Asking the AI..." : "Thinking...";
-  const color = phase === "ai" ? "text-ai" : "text-content/50";
+  if (phase !== "ai") {
+    return <div className="animate-pulse text-content/50">...</div>;
+  }
 
-  return <div className={`${color} animate-pulse`}>{text}</div>;
+  const messages = customMessages || DEFAULT_AI_MESSAGES;
+  const text = pickFromMessages(messages);
+  return <div className="animate-pulse text-ai italic">{text}</div>;
 }

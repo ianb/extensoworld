@@ -4,7 +4,14 @@
     "title": "Colossal Cave Adventure",
     "description": "The classic text adventure by Will Crowther and Don Woods. Explore a vast cave system, collect treasures, and avoid dangers.",
     "seed": 42,
-    "theme": "cave"
+    "theme": "cave",
+    "aiThinkingMessages": [
+      "A hollow wind echoes through the cavern...",
+      "Water drips somewhere in the darkness...",
+      "The cave seems to shift around you...",
+      "Shadows dance at the edge of your lamp light...",
+      "You hear a faint rumble from deep below..."
+    ]
   },
   "properties": [
     {

@@ -22,6 +22,8 @@ export interface GameData {
     seed?: number;
     /** Theme name for visual styling (default: none/site default) */
     theme?: string;
+    /** Custom messages shown while AI is generating — one picked per request */
+    aiThinkingMessages?: string[];
   };
   prompts?: GamePrompts;
   properties?: PropertyData[];

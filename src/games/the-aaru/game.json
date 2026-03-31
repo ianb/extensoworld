@@ -4,7 +4,14 @@
     "title": "The Aaru",
     "description": "A thousand-year generation ship, now silent. You wake in a hibernation pod with no memory. Explore the vast, strange vessel and piece together what happened.",
     "seed": 7,
-    "theme": "aaru"
+    "theme": "aaru",
+    "aiThinkingMessages": [
+      "The ship hums as dormant systems flicker to life...",
+      "Circuitry sparks behind the bulkhead...",
+      "Ancient processors whir somewhere deep in the hull...",
+      "The air recyclers stutter, then settle into a new rhythm...",
+      "A distant hatch groans open on rusted hinges..."
+    ]
   },
   "properties": [
     {

@@ -9,6 +9,7 @@ registerGame({
   title: data.meta.title,
   description: data.meta.description,
   theme: data.meta.theme,
+  aiThinkingMessages: data.meta.aiThinkingMessages,
   create() {
     const game = loadGameData(data);
     game.store.snapshot();

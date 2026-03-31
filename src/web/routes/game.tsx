@@ -26,12 +26,16 @@ function GamePage() {
   const [sidebarTab, setSidebarTab] = useStickyState<SidebarTab>("extenso:sidebarTab", "map");
   const [sidebarExpanded, setSidebarExpanded] = useStickyState("extenso:sidebarExpanded", false);
   const [showMobileMap, setShowMobileMap] = useState(false);
+  const [aiThinkingMessages, setAiThinkingMessages] = useState<string[] | null>(null);
 
   useEffect(() => {
     trpc.games.query().then((games) => {
       const match = games.find((g) => g.slug === gameId);
       if (match && match.theme) {
         document.documentElement.setAttribute("data-theme", match.theme);
+      }
+      if (match && match.aiThinkingMessages) {
+        setAiThinkingMessages(match.aiThinkingMessages);
       }
     });
     return () => {
@@ -55,6 +59,7 @@ function GamePage() {
             gameId={gameId}
             onEntityClick={setSelectedEntityId}
             onCommandComplete={handleCommandComplete}
+            aiThinkingMessages={aiThinkingMessages}
             mapButton={
               <button
                 onClick={() => setShowMobileMap(true)}

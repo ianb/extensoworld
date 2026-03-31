@@ -263,7 +263,7 @@ function ConnectorCell({
             y1={goesNE ? rect.height : 0}
             x2={rect.width}
             y2={goesNE ? 0 : rect.height}
-            className={isStub ? "stroke-content/15" : "stroke-content/30"}
+            className={isStub ? "stroke-content/30" : "stroke-content/50"}
             strokeWidth={2}
             strokeDasharray={isStub ? "4 3" : undefined}
           />
@@ -278,8 +278,8 @@ function ConnectorCell({
       <div
         className={`${isStub ? "border-dashed" : ""} ${
           isVertical
-            ? `h-full w-0 border-l-2 ${isStub ? "border-content/15" : "border-content/30"}`
-            : `h-0 w-full border-t-2 ${isStub ? "border-content/15" : "border-content/30"}`
+            ? `h-full w-0 border-l-2 ${isStub ? "border-content/30" : "border-content/50"}`
+            : `h-0 w-full border-t-2 ${isStub ? "border-content/30" : "border-content/50"}`
         }`}
       />
     </div>

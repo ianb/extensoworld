@@ -10,6 +10,7 @@ export interface GameDefinition {
   title: string;
   description: string;
   theme?: string;
+  aiThinkingMessages?: string[];
   create: () => GameInstance;
 }
 
