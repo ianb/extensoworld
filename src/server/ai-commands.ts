@@ -47,7 +47,7 @@ export async function handleAiCreateExitCommand(
     gameId: string;
     prompts?: GamePrompts;
     debug?: boolean;
-    authoring?: AuthoringInfo;
+    authoring: AuthoringInfo;
   },
 ): Promise<CommandResponse> {
   const players = store.findByTag("player");
@@ -96,7 +96,7 @@ export async function handleAiCreateCommand(
     gameId: string;
     prompts?: GamePrompts;
     debug?: boolean;
-    authoring?: AuthoringInfo;
+    authoring: AuthoringInfo;
   },
 ): Promise<CommandResponse> {
   const players = store.findByTag("player");
@@ -146,7 +146,7 @@ export async function handleUnresolvedExit(
     session: SessionKey;
     prompts?: GamePrompts;
     debug?: boolean;
-    authoring?: AuthoringInfo;
+    authoring: AuthoringInfo;
   },
 ): Promise<CommandResponse> {
   const result = await handleAiCreateRoom(store, {
@@ -230,7 +230,7 @@ export async function handleVerbFallbackCommand(
     debug?: boolean;
     existingDebug?: DebugInfo;
     aiInstructions?: string;
-    authoring?: AuthoringInfo;
+    authoring: AuthoringInfo;
   },
 ): Promise<FallbackResponse> {
   const fallback = await handleVerbFallback(store, {

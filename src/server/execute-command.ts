@@ -218,9 +218,11 @@ export async function executeCommand(
   }
 
   // Check if a start-conversation event was emitted
+  const talkAuthoring = { ...authoring, creationSource: "conversation" };
   const convStart = await checkForConversationStart(game, {
     events: result.events,
     session,
+    authoring: talkAuthoring,
   });
   if (convStart) {
     return {

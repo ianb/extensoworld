@@ -71,7 +71,7 @@ export async function handleSceneryCheck(
     gameId: string;
     prompts?: GamePrompts;
     debug?: boolean;
-    authoring?: AuthoringInfo;
+    authoring: AuthoringInfo;
   },
 ): Promise<SceneryResponse | null> {
   const room = getPlayerRoom(game.store);
@@ -121,7 +121,7 @@ export async function handleSceneryCheck(
   });
 
   // Record AI usage if this was a new generation (not cached)
-  if (result.debug && authoring) {
+  if (result.debug) {
     await recordAiCall(authoring.createdBy, "scenery");
   }
 

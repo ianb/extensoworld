@@ -172,7 +172,7 @@ export async function handleAiConversationFallback(
     existingWords: WordEntry[];
     session: SessionKey;
     prompts?: GamePrompts;
-    authoring?: AuthoringInfo;
+    authoring: AuthoringInfo;
   },
 ): Promise<AiConversationResult> {
   const systemPrompt = buildSystemPrompt({ npc, room, store, prompts });
@@ -191,7 +191,7 @@ export async function handleAiConversationFallback(
   });
 
   const durationMs = Date.now() - startTime;
-  if (authoring) await recordAiCall(authoring.createdBy, "conversation");
+  await recordAiCall(authoring.createdBy, "conversation");
   const response = result.object;
   console.log(`[ai-conversation] Decision: ${response.decision} (${durationMs}ms)`);
 

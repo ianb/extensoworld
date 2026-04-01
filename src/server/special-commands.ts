@@ -16,7 +16,7 @@ interface CommandOpts {
   prompts?: GameInstance["prompts"];
   debug?: boolean;
   hasAiRole?: boolean;
-  authoring?: AuthoringInfo;
+  authoring: AuthoringInfo;
 }
 
 type CommandReturn =
@@ -92,14 +92,14 @@ export function handleSpecialCommand(
   if (trimmed.startsWith("ai create exit ")) {
     const instructions = trimmed.slice("ai create exit ".length).trim();
     if (!instructions) return { output: "Usage: ai create exit <description>", debug: undefined };
-    const a = opts.authoring ? { ...opts.authoring, creationSource: "ai-create-exit" } : undefined;
+    const a = { ...opts.authoring, creationSource: "ai-create-exit" };
     return handleAiCreateExitCommand(game.store, { instructions, ...opts, authoring: a });
   }
 
   if (trimmed.startsWith("ai create ")) {
     const description = trimmed.slice("ai create ".length).trim();
     if (!description) return { output: "Usage: ai create <description>", debug: undefined };
-    const a = opts.authoring ? { ...opts.authoring, creationSource: "ai-create" } : undefined;
+    const a = { ...opts.authoring, creationSource: "ai-create" };
     return handleAiCreateCommand(game.store, { description, ...opts, authoring: a });
   }
 

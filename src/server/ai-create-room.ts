@@ -123,7 +123,7 @@ export async function handleAiCreateRoom(
     playerId: string;
     prompts?: GamePrompts;
     debug?: boolean;
-    authoring?: AuthoringInfo;
+    authoring: AuthoringInfo;
   },
 ): Promise<AiCreateRoomResult> {
   const systemPrompt = buildSystemPrompt({ prompts, room: sourceRoom, store });
@@ -141,7 +141,7 @@ export async function handleAiCreateRoom(
     abortSignal: getLlmAbortSignal(),
   });
   const durationMs = Date.now() - startTime;
-  if (authoring) await recordAiCall(authoring.createdBy, "room");
+  await recordAiCall(authoring.createdBy, "room");
   const response = result.object;
   const roomData = response.room;
   console.log(`[ai-create-room] Created: ${roomData.name} (${durationMs}ms)`);
@@ -261,7 +261,7 @@ async function createReturnAndAdditionalExits(
       }>;
     };
     gameId: string;
-    authoring?: AuthoringInfo;
+    authoring: AuthoringInfo;
   },
 ): Promise<void> {
   const returnDir = reverseDirection(direction);

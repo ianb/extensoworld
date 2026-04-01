@@ -163,7 +163,7 @@ export async function handleAiCreate(
     playerId: string;
     prompts?: GamePrompts;
     debug?: boolean;
-    authoring?: AuthoringInfo;
+    authoring: AuthoringInfo;
   },
 ): Promise<AiCreateResult> {
   const systemPrompt = buildCreateSystemPrompt({ prompts, room, store });
@@ -183,7 +183,7 @@ export async function handleAiCreate(
   });
 
   const durationMs = Date.now() - startTime;
-  if (authoring) await recordAiCall(authoring.createdBy, "ai-create");
+  await recordAiCall(authoring.createdBy, "ai-create");
   const response = result.object;
 
   console.log(`[ai-create] Created: ${response.name} (${durationMs}ms)`);

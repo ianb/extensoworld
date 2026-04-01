@@ -147,7 +147,7 @@ export async function handleAiCreateExit(
     gameId: string;
     prompts?: GamePrompts;
     debug?: boolean;
-    authoring?: AuthoringInfo;
+    authoring: AuthoringInfo;
   },
 ): Promise<AiCreateExitResult> {
   const systemPrompt = buildSystemPrompt({ prompts, room, store });
@@ -167,7 +167,7 @@ export async function handleAiCreateExit(
   });
 
   const durationMs = Date.now() - startTime;
-  if (authoring) await recordAiCall(authoring.createdBy, "ai-create-exit");
+  await recordAiCall(authoring.createdBy, "ai-create-exit");
   const response = result.object;
 
   console.log(

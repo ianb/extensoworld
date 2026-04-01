@@ -17,7 +17,7 @@ export async function createAndSave(
     tags: string[];
     properties: Record<string, unknown>;
     gameId: string;
-    authoring?: AuthoringInfo;
+    authoring: AuthoringInfo;
   },
 ): Promise<void> {
   store.create(opts.id, { tags: opts.tags, properties: opts.properties });
@@ -27,7 +27,7 @@ export async function createAndSave(
 /** Persist an existing entity's current state to storage. */
 export async function persistEntity(
   store: EntityStore,
-  { entity, gameId, authoring }: { entity: Entity; gameId: string; authoring?: AuthoringInfo },
+  { entity, gameId, authoring }: { entity: Entity; gameId: string; authoring: AuthoringInfo },
 ): Promise<void> {
   await getStorage().saveAiEntity({
     createdAt: new Date().toISOString(),
@@ -42,7 +42,7 @@ export async function persistEntity(
 /** Ensure a room has grid coordinates; bootstraps to (0,0,0) if missing. */
 export async function ensureGridCoords(
   store: EntityStore,
-  { room, gameId, authoring }: { room: Entity; gameId: string; authoring?: AuthoringInfo },
+  { room, gameId, authoring }: { room: Entity; gameId: string; authoring: AuthoringInfo },
 ): Promise<void> {
   if (room.properties["gridX"] || room.properties["gridY"]) return;
   store.setProperty(room.id, { name: "gridX", value: 0 });
@@ -76,7 +76,7 @@ export async function resolveOrCreateBackExit(
     exitName?: string;
     exitDescription?: string;
     gameId: string;
-    authoring?: AuthoringInfo;
+    authoring: AuthoringInfo;
   },
 ): Promise<void> {
   const backDir = reverseDirection(direction);

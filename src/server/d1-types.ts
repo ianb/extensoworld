@@ -91,19 +91,15 @@ export function userRowToRecord(row: UserRow): UserRecord {
   };
 }
 
-export function rowToAuthoring(row: AuthoringColumns): AuthoringInfo | undefined {
-  if (!row.created_by) return undefined;
+export function rowToAuthoring(row: AuthoringColumns): AuthoringInfo {
   return {
-    createdBy: row.created_by,
+    createdBy: row.created_by || "unknown",
     creationSource: row.creation_source || "unknown",
     creationCommand: row.creation_command || undefined,
   };
 }
 
 /** Extract authoring bind values as an array for SQL parameter binding */
-export function authoringBindValues(
-  authoring: AuthoringInfo | undefined,
-): [string | null, string | null, string | null] {
-  if (!authoring) return [null, null, null];
+export function authoringBindValues(authoring: AuthoringInfo): [string, string, string | null] {
   return [authoring.createdBy, authoring.creationSource, authoring.creationCommand || null];
 }

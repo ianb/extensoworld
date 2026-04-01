@@ -102,7 +102,7 @@ export async function handleVerbFallback(
     prompts?: GamePrompts;
     debug?: boolean;
     aiInstructions?: string;
-    authoring?: AuthoringInfo;
+    authoring: AuthoringInfo;
   },
 ): Promise<FallbackResult> {
   const systemPrompt = buildSystemPrompt(libClass, { prompts, room, store });
@@ -123,7 +123,7 @@ export async function handleVerbFallback(
   });
 
   const durationMs = Date.now() - startTime;
-  if (authoring) await recordAiCall(authoring.createdBy, "verb-fallback");
+  await recordAiCall(authoring.createdBy, "verb-fallback");
   const response = result.object;
 
   console.log(

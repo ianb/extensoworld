@@ -13,14 +13,14 @@ export interface AuthoringInfo {
 export type AiEntityRecord = EntityData & {
   createdAt: string;
   gameId: string;
-  authoring?: AuthoringInfo;
+  authoring: AuthoringInfo;
 };
 
 /** Metadata added to AI-created handlers */
 export type AiHandlerRecord = HandlerData & {
   createdAt: string;
   gameId: string;
-  authoring?: AuthoringInfo;
+  authoring: AuthoringInfo;
 };
 
 /** A single command's worth of events */
@@ -35,7 +35,7 @@ export interface WordEntryRecord extends WordEntry {
   createdAt: string;
   gameId: string;
   npcId: string;
-  authoring?: AuthoringInfo;
+  authoring: AuthoringInfo;
 }
 
 /** Identifies a user's session within a game */
