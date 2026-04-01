@@ -92,6 +92,10 @@ export class EntityStore {
     // Validate all initial properties against the registry
     const props = options.properties || {};
     for (const [propName, propValue] of Object.entries(props)) {
+      if (propValue === null || propValue === undefined) {
+        delete props[propName];
+        continue;
+      }
       const def = this.registry.definitions[propName];
       if (!def) {
         throw new UndefinedPropertyError(propName);
@@ -149,6 +153,12 @@ export class EntityStore {
   setProperty(id: string, assignment: { name: string; value: unknown }): void {
     const entity = this.get(id);
     const { name, value } = assignment;
+
+    // Null/undefined means delete the property
+    if (value === null || value === undefined) {
+      delete entity.properties[name];
+      return;
+    }
 
     // Property must be defined in the registry
     const def = this.registry.definitions[name];
