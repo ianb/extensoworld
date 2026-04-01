@@ -31,6 +31,16 @@ export class UndefinedPropertyError extends Error {
 }
 
 const ajv = new Ajv({ allErrors: true, formats: { "entity-ref": true } });
+const validatorCache = new WeakMap<JSONSchema7, ReturnType<typeof ajv.compile>>();
+
+function getValidator(schema: JSONSchema7): ReturnType<typeof ajv.compile> {
+  let validate = validatorCache.get(schema);
+  if (!validate) {
+    validate = ajv.compile(schema);
+    validatorCache.set(schema, validate);
+  }
+  return validate;
+}
 
 export function createRegistry(definitions?: PropertyDefinition[]): PropertyRegistry {
   const registry: PropertyRegistry = { definitions: {} };
@@ -54,7 +64,7 @@ export function validateValue(
   if (!def) {
     return [`Property "${entry.name}" is not defined in the registry`];
   }
-  const validate = ajv.compile(def.schema);
+  const validate = getValidator(def.schema);
   if (validate(entry.value)) {
     return [];
   }

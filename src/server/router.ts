@@ -45,7 +45,7 @@ function applyAiEntities(
   store: EntityStore,
 ): void {
   for (const record of records) {
-    normalizeScenery(record.properties);
+    if ("scenery" in record.properties) normalizeScenery(record.properties);
     if (store.has(record.id)) {
       for (const [key, value] of Object.entries(record.properties)) {
         if (value === null) {

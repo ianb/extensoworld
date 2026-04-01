@@ -6,6 +6,7 @@ import type {
   WordEntryRecord,
   UserRecord,
   SessionKey,
+  ErrorLogRecord,
 } from "./storage.js";
 import type {
   D1Database,
@@ -292,15 +293,7 @@ export class D1Storage implements RuntimeStorage {
     return result || 0;
   }
 
-  async logError(entry: {
-    timestamp: string;
-    source: string;
-    message: string;
-    stack?: string;
-    context?: string;
-    userId?: string;
-    gameId?: string;
-  }): Promise<void> {
+  async logError(entry: ErrorLogRecord): Promise<void> {
     await this.db
       .prepare(
         `INSERT INTO error_log (timestamp, source, message, stack, context, user_id, game_id)
@@ -316,8 +309,10 @@ export class D1Storage implements RuntimeStorage {
         entry.gameId || null,
       )
       .run();
-    // Prune entries older than 2 days
-    const cutoff = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
-    await this.db.prepare("DELETE FROM error_log WHERE timestamp < ?").bind(cutoff).run();
+    // Prune entries older than 2 days (~10% of writes)
+    if (Math.random() < 0.1) {
+      const cutoff = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+      await this.db.prepare("DELETE FROM error_log WHERE timestamp < ?").bind(cutoff).run();
+    }
   }
 }

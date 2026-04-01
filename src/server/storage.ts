@@ -101,13 +101,15 @@ export interface RuntimeStorage {
   countAiUsage(userId: string, since: string): Promise<number>;
 
   // --- Error Log (optional — only D1 persists) ---
-  logError?(entry: {
-    timestamp: string;
-    source: string;
-    message: string;
-    stack?: string;
-    context?: string;
-    userId?: string;
-    gameId?: string;
-  }): Promise<void>;
+  logError?(entry: ErrorLogRecord): Promise<void>;
+}
+
+export interface ErrorLogRecord {
+  timestamp: string;
+  source: string;
+  message: string;
+  stack?: string;
+  context?: string;
+  userId?: string;
+  gameId?: string;
 }
