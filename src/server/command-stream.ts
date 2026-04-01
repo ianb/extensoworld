@@ -51,7 +51,7 @@ export async function handleCommandStream(
           send({ phase: "done", result });
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : String(err);
-          logErrorObj("command-stream", { error: err, userId: user.userId, gameId });
+          await logErrorObj("command-stream", { error: err, userId: user.userId, gameId });
           send({ phase: "error", error: message });
         } finally {
           controller.close();
@@ -104,7 +104,7 @@ export async function handleCommandStreamNode(
     send({ phase: "done", result });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    logErrorObj("command-stream", { error: err, userId: user.userId, gameId: body.gameId });
+    await logErrorObj("command-stream", { error: err, userId: user.userId, gameId: body.gameId });
     send({ phase: "error", error: message });
   } finally {
     res.end();

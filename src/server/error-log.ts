@@ -10,27 +10,28 @@ export interface ErrorLogEntry {
 }
 
 /** Log an error to persistent storage (D1 in prod, console in dev) */
-export function logError(entry: ErrorLogEntry): void {
+export async function logError(entry: ErrorLogEntry): Promise<void> {
   const timestamp = new Date().toISOString();
   console.error(`[${entry.source}] ${entry.message}`);
   if (entry.stack) console.error(entry.stack);
 
-  // Fire-and-forget — don't let logging failures propagate
   const storage = getStorage();
   if (storage.logError) {
-    storage.logError({ ...entry, timestamp }).catch((err: unknown) => {
+    try {
+      await storage.logError({ ...entry, timestamp });
+    } catch (err: unknown) {
       console.error("[error-log] Failed to persist error:", err);
-    });
+    }
   }
 }
 
 /** Log an Error object with context */
-export function logErrorObj(
+export async function logErrorObj(
   source: string,
   opts: { error: unknown; userId?: string; gameId?: string; context?: string },
-): void {
+): Promise<void> {
   const err = opts.error instanceof Error ? opts.error : new Error(String(opts.error));
-  logError({
+  await logError({
     source,
     message: err.message,
     stack: err.stack,

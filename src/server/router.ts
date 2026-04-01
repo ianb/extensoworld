@@ -10,6 +10,7 @@ import type { GameInstance } from "../games/registry.js";
 import { getGame, listGames, isValidGameId } from "../games/registry.js";
 import { executeCommand } from "./execute-command.js";
 import type { SessionKey } from "./storage.js";
+import { logErrorObj } from "./error-log.js";
 
 // Game registrations are imported by the entry point (server/index.ts or worker.ts)
 // NOT here, so the router can be used with either fs-based or bundled game data.
@@ -144,7 +145,12 @@ export const appRouter = router({
         );
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
-        console.error("[command] Error:", err);
+        await logErrorObj("command", {
+          error: err,
+          userId: ctx.userId || undefined,
+          gameId: input.gameId,
+          context: input.text,
+        });
         return { output: `{!Error: ${message}!}`, debug: undefined };
       }
     }),
