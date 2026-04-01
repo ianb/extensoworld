@@ -102,6 +102,9 @@ server.register(fastifyTRPCPlugin, {
         roles: user ? user.roles : [],
       };
     },
+    onError: ({ error, path }: { error: Error; path?: string }) => {
+      console.error(`[trpc] Error in ${path || "unknown"}:`, error);
+    },
   },
 });
 

@@ -89,11 +89,11 @@ export class EntityStore {
     if (this.entities.has(id)) {
       throw new DuplicateEntityError(id);
     }
-    // Validate all initial properties against the registry
-    const props = options.properties || {};
-    for (const [propName, propValue] of Object.entries(props)) {
+    // Validate all initial properties against the registry — strip null/undefined
+    const rawProps = options.properties || {};
+    const props: Record<string, unknown> = {};
+    for (const [propName, propValue] of Object.entries(rawProps)) {
       if (propValue === null || propValue === undefined) {
-        delete props[propName];
         continue;
       }
       const def = this.registry.definitions[propName];
@@ -104,6 +104,7 @@ export class EntityStore {
       if (errors.length > 0) {
         throw new PropertyValueError(propName, errors);
       }
+      props[propName] = propValue;
     }
 
     const entity: Entity = {
