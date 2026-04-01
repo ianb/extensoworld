@@ -141,8 +141,9 @@ const BASE_PROPS = [
   },
   {
     name: "scenery",
-    description: "Scenery descriptions for atmospheric details in a room",
-    schema: { type: "array" },
+    description:
+      "Interactive scenery entries — each must be an object with word, description, rejection, and optional aliases",
+    schema: { type: "array", items: { type: "object" } },
   },
   {
     name: "destinationIntent",
