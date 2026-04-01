@@ -4,18 +4,21 @@ import { trpc } from "./trpc.js";
 interface PromptData {
   verb: string;
   create: string;
+  conversation: string;
   world: string | null;
   worldVerb: string | null;
   worldCreate: string | null;
+  worldConversation: string | null;
   region: string | null;
+  regionConversation: string | null;
   room: string | null;
 }
 
 export function PromptViewer({ gameId, revision }: { gameId: string; revision: number }) {
   const [data, setData] = useState<PromptData | null>(null);
-  const [activeTab, setActiveTab] = useState<"composed-verb" | "composed-create" | "layers">(
-    "layers",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "composed-verb" | "composed-create" | "composed-conversation" | "layers"
+  >("layers");
 
   useEffect(() => {
     trpc.prompts.query({ gameId }).then(setData);
@@ -29,6 +32,7 @@ export function PromptViewer({ gameId, revision }: { gameId: string; revision: n
     { key: "layers", label: "Layers" },
     { key: "composed-verb", label: "Verb" },
     { key: "composed-create", label: "Create" },
+    { key: "composed-conversation", label: "Conversation" },
   ];
 
   return (
@@ -52,6 +56,7 @@ export function PromptViewer({ gameId, revision }: { gameId: string; revision: n
         {activeTab === "layers" && <LayersView data={data} />}
         {activeTab === "composed-verb" && <ComposedView content={data.verb} />}
         {activeTab === "composed-create" && <ComposedView content={data.create} />}
+        {activeTab === "composed-conversation" && <ComposedView content={data.conversation} />}
       </div>
     </div>
   );
@@ -71,7 +76,17 @@ function LayersView({ data }: { data: PromptData }) {
         content={data.worldCreate}
         fallback="(using default)"
       />
+      <PromptSection
+        title="World — Conversation Guidance"
+        content={data.worldConversation}
+        fallback="(using default)"
+      />
       <PromptSection title="Region" content={data.region} fallback="(none)" />
+      <PromptSection
+        title="Region — Conversation"
+        content={data.regionConversation}
+        fallback="(none)"
+      />
       <PromptSection title="Room" content={data.room} fallback="(none)" />
     </div>
   );

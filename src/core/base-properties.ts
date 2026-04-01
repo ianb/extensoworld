@@ -128,6 +128,12 @@ const BASE_PROPS = [
     schema: { type: "string" },
   },
   {
+    name: "aiConversationPrompt",
+    description:
+      "AI guidance prompt for NPC conversation generation in this region (not shown to players)",
+    schema: { type: "string" },
+  },
+  {
     name: "secret",
     description:
       "Hidden interactive potential not obvious from the description — guides AI verb resolution (not shown to players)",

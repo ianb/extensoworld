@@ -5,7 +5,7 @@ import type { EntityStore } from "../core/index.js";
 import { recordToHandler } from "./handler-convert.js";
 import { applyEvents } from "./event-apply.js";
 import { getStorage } from "./storage-instance.js";
-import { composeVerbPrompt, composeCreatePrompt } from "./ai-prompts.js";
+import { composeVerbPrompt, composeCreatePrompt, composeConversationPrompt } from "./ai-prompts.js";
 import type { GameInstance } from "../games/registry.js";
 import { getGame, listGames, isValidGameId } from "../games/registry.js";
 import { executeCommand } from "./execute-command.js";
@@ -221,10 +221,13 @@ export const appRouter = router({
       return {
         verb: "",
         create: "",
+        conversation: "",
         world: null,
         worldVerb: null,
         worldCreate: null,
+        worldConversation: null,
         region: null,
+        regionConversation: null,
         room: null,
       };
     const roomId = player.properties["location"] as string;
@@ -233,19 +236,24 @@ export const appRouter = router({
     const roomPrompt = (room.properties["aiPrompt"] as string) || null;
     const regionId = room.properties["location"] as string | undefined;
     let regionPrompt: string | null = null;
+    let regionConversationPrompt: string | null = null;
     if (regionId && regionId !== "world" && game.store.has(regionId)) {
       const region = game.store.get(regionId);
       if (region.tags.has("region")) {
         regionPrompt = (region.properties["aiPrompt"] as string) || null;
+        regionConversationPrompt = (region.properties["aiConversationPrompt"] as string) || null;
       }
     }
     return {
       verb: composeVerbPrompt(promptCtx),
       create: composeCreatePrompt(promptCtx),
+      conversation: composeConversationPrompt(promptCtx),
       world: (game.prompts && game.prompts.world) || null,
       worldVerb: (game.prompts && game.prompts.worldVerb) || null,
       worldCreate: (game.prompts && game.prompts.worldCreate) || null,
+      worldConversation: (game.prompts && game.prompts.worldConversation) || null,
       region: regionPrompt,
+      regionConversation: regionConversationPrompt,
       room: roomPrompt,
     };
   }),

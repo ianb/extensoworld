@@ -13,6 +13,7 @@ import { verifyJwt, parseCookie } from "./auth/jwt.js";
 import "../games/test-world.js";
 import "../games/colossal-cave/index.js";
 import "../games/the-aaru/index.js";
+import "../games/tinkermarket/index.js";
 
 // Configure file-based storage
 setStorage(

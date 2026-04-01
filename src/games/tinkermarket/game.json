@@ -1,0 +1,40 @@
+{
+  "meta": {
+    "slug": "tinkermarket",
+    "title": "Tinkermarket",
+    "description": "A sprawling marketplace at the crossroads between dimensions. Merchants and artisans from alien worlds hawk strange materials and unfamiliar craftsmanship. Acquire, combine, and craft your way through the bazaar.",
+    "seed": 42,
+    "theme": "tinkermarket",
+    "aiThinkingMessages": [
+      "A vendor rearranges their wares...",
+      "Someone hammers metal in a distant stall...",
+      "The smell of unfamiliar spices drifts past...",
+      "A cart rattles over the cobblestones...",
+      "Voices haggle in a language you almost understand..."
+    ]
+  },
+  "properties": [
+    {
+      "name": "material",
+      "description": "What substance or material this item is made from or contains",
+      "schema": {
+        "type": "string"
+      }
+    },
+    {
+      "name": "craftable",
+      "description": "Whether this item can be used as an ingredient in crafting",
+      "schema": {
+        "type": "boolean"
+      },
+      "defaultValue": false
+    },
+    {
+      "name": "origin",
+      "description": "Which dimension or world this item or person comes from",
+      "schema": {
+        "type": "string"
+      }
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import type { Entity, EntityStore } from "../core/entity.js";
 import type { GamePrompts } from "../core/game-data.js";
+import { applyPromptSampling } from "./prompt-sampling.js";
 
 export interface PromptContext {
   prompts?: GamePrompts;
@@ -38,13 +39,23 @@ function appendRegionAndRoom(sections: string[], context: PromptContext): void {
   if (region) {
     const regionPrompt = region.properties["aiPrompt"] as string | undefined;
     if (regionPrompt) {
-      sections.push(tag("region-context", regionPrompt));
+      sections.push(tag("region-context", applyPromptSampling(regionPrompt)));
     }
   }
 
   const roomPrompt = context.room.properties["aiPrompt"] as string | undefined;
   if (roomPrompt) {
-    sections.push(tag("room-context", roomPrompt));
+    sections.push(tag("room-context", applyPromptSampling(roomPrompt)));
+  }
+}
+
+function appendRegionConversation(sections: string[], context: PromptContext): void {
+  const region = findRegion(context);
+  if (region) {
+    const convPrompt = region.properties["aiConversationPrompt"] as string | undefined;
+    if (convPrompt) {
+      sections.push(tag("region-conversation", applyPromptSampling(convPrompt)));
+    }
   }
 }
 
@@ -53,10 +64,10 @@ export function composeVerbPrompt(context: PromptContext): string {
   const sections: string[] = [];
 
   const worldStyle = (context.prompts && context.prompts.world) || DEFAULT_STYLE;
-  sections.push(tag("world-style", worldStyle));
+  sections.push(tag("world-style", applyPromptSampling(worldStyle)));
 
   const verbGuidance = (context.prompts && context.prompts.worldVerb) || DEFAULT_VERB_GUIDANCE;
-  sections.push(tag("verb-guidance", verbGuidance));
+  sections.push(tag("verb-guidance", applyPromptSampling(verbGuidance)));
 
   appendRegionAndRoom(sections, context);
   return sections.join("\n\n");
@@ -67,11 +78,11 @@ export function composeCreatePrompt(context: PromptContext): string {
   const sections: string[] = [];
 
   const worldStyle = (context.prompts && context.prompts.world) || DEFAULT_STYLE;
-  sections.push(tag("world-style", worldStyle));
+  sections.push(tag("world-style", applyPromptSampling(worldStyle)));
 
   const createGuidance =
     (context.prompts && context.prompts.worldCreate) || DEFAULT_CREATE_GUIDANCE;
-  sections.push(tag("create-guidance", createGuidance));
+  sections.push(tag("create-guidance", applyPromptSampling(createGuidance)));
 
   appendRegionAndRoom(sections, context);
   return sections.join("\n\n");
@@ -82,12 +93,13 @@ export function composeConversationPrompt(context: PromptContext): string {
   const sections: string[] = [];
 
   const worldStyle = (context.prompts && context.prompts.world) || DEFAULT_STYLE;
-  sections.push(tag("world-style", worldStyle));
+  sections.push(tag("world-style", applyPromptSampling(worldStyle)));
 
   const convGuidance =
     (context.prompts && context.prompts.worldConversation) || DEFAULT_CONVERSATION_GUIDANCE;
-  sections.push(tag("conversation-guidance", convGuidance));
+  sections.push(tag("conversation-guidance", applyPromptSampling(convGuidance)));
 
   appendRegionAndRoom(sections, context);
+  appendRegionConversation(sections, context);
   return sections.join("\n\n");
 }

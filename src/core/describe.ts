@@ -48,8 +48,17 @@ export function describeRoomFull(
   });
   const exitList = exitDescs.length > 0 ? exitDescs.join(", ") : "none";
 
-  const items = contents.filter((e) => !e.tags.has("exit") && e.id !== playerId);
+  const nonExits = contents.filter((e) => !e.tags.has("exit") && e.id !== playerId);
+  const npcs = nonExits.filter((e) => e.tags.has("npc"));
+  const items = nonExits.filter((e) => !e.tags.has("npc"));
   const parts = [`${name}\n\n${description}`];
+
+  if (npcs.length > 0) {
+    const npcDescs = npcs.map((e) => itemDisplay(e, store));
+    parts.push(
+      `\n${npcs.length === 1 ? `${npcDescs[0]!} is here.` : `${npcDescs.join(", ")} are here.`}`,
+    );
+  }
 
   if (items.length > 0) {
     const itemDescs = items.map((e) => {

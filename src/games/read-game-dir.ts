@@ -58,7 +58,7 @@ export function readGameDir(dir: string): GameData {
 }
 
 /** Read prompt .md files from a prompts/ subdirectory */
-function readPrompts(dir: string): GamePrompts | null {
+export function readPrompts(dir: string): GamePrompts | null {
   const promptDir = resolve(dir, "prompts");
   if (!existsSync(promptDir)) return null;
 

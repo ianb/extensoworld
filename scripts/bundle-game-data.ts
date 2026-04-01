@@ -15,7 +15,7 @@ const gamesDir = resolve(__dirname, "../src/games");
 const outDir = resolve(__dirname, "../generated");
 const outFile = resolve(outDir, "bundled-data.ts");
 
-const gameDirs = ["test-world", "colossal-cave", "the-aaru"];
+const gameDirs = ["test-world", "colossal-cave", "the-aaru", "tinkermarket"];
 
 const games = gameDirs.map((dir) => {
   const fullPath = resolve(gamesDir, dir);
