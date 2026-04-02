@@ -46,7 +46,7 @@ With code: JavaScript function body — use "code" for handlers that need condit
 
 The code has access to these variables:
 
-- object — the target entity: { id, tags (Set), properties (object) }
+- object — the target entity (see Entity shape below)
 - indirect — the second entity for "verb X prep Y" commands (e.g. "use wrench on panel" → object=wrench, indirect=panel). Null for transitive/prepositional commands.
 - player — the player entity (same shape)
 - room — the current room entity
@@ -55,7 +55,10 @@ The code has access to these variables:
 - lib — helper library:
 ${libLines}
 
-Entity shape: { id: string, tags: Set<string>, properties: { [name]: value } }
+Entity shape: { id, tags: string[], name, description, location, aliases: string[], properties: { [name]: value } }
+- Typed fields: object.name, object.description, object.location, object.aliases
+- Game properties (in properties bag): object.properties.open, .locked, .lit, .switchedOn, .fixed, .takeRefusal, etc.
+- Tags: object.tags.includes("tagname")
 
 The code MUST return: { output: string, events: WorldEvent[] }
 </perform-handlers>
@@ -87,7 +90,7 @@ Eat something (moves it to void):
 \`\`\`
 return {
   output: "You eat the " + lib.ref(object) + ". Not bad!",
-  events: [lib.moveEvent(object.id, { to: "void", from: object.properties.location, description: "Food consumed" })]
+  events: [lib.moveEvent(object.id, { to: "void", from: object.location, description: "Food consumed" })]
 };
 \`\`\`
 
@@ -115,7 +118,7 @@ return {
 
 Strip copper wire from an object (creates a new item for the player):
 \`\`\`
-if (object.properties.description.includes("stripped")) {
+if (object.description.includes("stripped")) {
   return lib.result("There is nothing left to strip.");
 }
 return {
@@ -146,7 +149,7 @@ Entity creation: lib.createEvent(entityId, { tags, properties, description }). U
 
 // --- User prompt building ---
 
-const HIDDEN_PROPERTIES = new Set(["description", "shortDescription", "secret", "aiPrompt"]);
+const HIDDEN_PROPERTIES = new Set(["shortDescription"]);
 
 function describeEntityForLlm(entity: Entity): string {
   const tags = entity.tags.join(", ");
@@ -155,7 +158,8 @@ function describeEntityForLlm(entity: Entity): string {
     if (HIDDEN_PROPERTIES.has(key)) continue;
     props[key] = value;
   }
-  return `- id: ${entity.id}\n  tags: [${tags}]\n  properties: ${JSON.stringify(props)}`;
+  const propsStr = Object.keys(props).length > 0 ? `\n  properties: ${JSON.stringify(props)}` : "";
+  return `- id: ${entity.id}\n  name: ${entity.name}\n  tags: [${tags}]\n  description: ${entity.description}${propsStr}`;
 }
 
 export function describeCommand(command: ResolvedCommand): string {
@@ -207,10 +211,7 @@ export function buildFallbackPrompt(
   }
 
   if (involved.length > 0) {
-    const descs = involved.map((e) => {
-      const desc = e.description || "No description.";
-      return `${describeEntityForLlm(e)}\n  description: "${desc}"`;
-    });
+    const descs = involved.map((e) => describeEntityForLlm(e));
     parts.push(`<target-objects>\n${descs.join("\n\n")}\n</target-objects>`);
   }
 

@@ -212,10 +212,10 @@ export function buildNearbyContext(
 ): string {
   const sections: string[] = [];
 
-  // Current room entities (sample 2)
-  const roomContents = store.getContents(room.id).filter(isInteresting);
+  // Current room entities including carried items (sample 3)
+  const roomContents = store.getContentsDeep(room.id).filter(isInteresting);
   if (roomContents.length > 0) {
-    const sampled = sample(roomContents, 2);
+    const sampled = sample(roomContents, 3);
     const roomName = room.name;
     sections.push(`Current room (${roomName}):\n${sampled.map(describeEntityDetail).join("\n\n")}`);
   }
