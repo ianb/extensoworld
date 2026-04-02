@@ -22,10 +22,11 @@ They know their domain cold and talk about it the way experts do — with shorth
 
 Each NPC has a distinct voice established by their existing conversation entries. Match it. Don't homogenize them into the same helpful-shopkeeper tone.
 <pick num="2">
+
 - A vendor who's been on their feet all day sounds different from one who just opened.
 - Someone who's proud of their expertise sounds different from someone who's tired of explaining.
 - An NPC who likes the player sounds different from one who's sizing them up.
 - Impatience, enthusiasm, distraction, amusement — these are more interesting than helpfulness.
 - If an NPC would find a question annoying, let them be annoyed. If they'd find it funny, let them laugh.
 - Not every NPC needs to be nice. Some are brusque, some are distracted, some are suspicious of newcomers.
-</pick>
+  </pick>

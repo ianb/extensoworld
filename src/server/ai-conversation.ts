@@ -58,7 +58,7 @@ const responseSchema = z.object({
 const HIDDEN_PROPERTIES = new Set(["secret", "aiPrompt"]);
 
 function describeNpcForLlm(npc: Entity): string {
-  const tags = Array.from(npc.tags).join(", ");
+  const tags = npc.tags.join(", ");
   const props: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(npc.properties)) {
     if (HIDDEN_PROPERTIES.has(key)) continue;
@@ -94,7 +94,7 @@ function buildSystemPrompt({
 }): string {
   const styleSection = composeConversationPrompt({ prompts, room, store });
 
-  const npcSecret = npc.properties["secret"] as string | undefined;
+  const npcSecret = npc.secret;
   const secretSection = npcSecret
     ? `\n<secret>\nHidden information the player doesn't know. Be aware of this when responding, but don't reveal it directly. If the player's topic naturally engages with the secret, let it partially emerge — reward their intuition.\n\n${npcSecret}\n</secret>\n`
     : "";

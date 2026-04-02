@@ -56,11 +56,11 @@ function buildSystemPrompt({
   const styleSection = composeVerbPrompt({ prompts, room, store });
   // Collect secrets from room and source entity
   const secrets: string[] = [];
-  const roomSecret = room.properties["secret"] as string | undefined;
+  const roomSecret = room.secret;
   if (roomSecret) secrets.push(`Room: ${roomSecret}`);
   if (sourceEntity) {
-    const s = sourceEntity.properties["secret"] as string | undefined;
-    if (s) secrets.push(`${sourceEntity.properties["name"] || sourceEntity.id}: ${s}`);
+    const s = sourceEntity.secret;
+    if (s) secrets.push(`${sourceEntity.name}: ${s}`);
   }
   const secretSection =
     secrets.length > 0
@@ -87,12 +87,12 @@ function buildPrompt(opts: {
   recentOutput?: string;
 }): string {
   const parts: string[] = [];
-  const roomName = (opts.room.properties["name"] as string) || opts.room.id;
-  const roomDesc = (opts.room.properties["description"] as string) || "";
+  const roomName = opts.room.name;
+  const roomDesc = opts.room.description;
   parts.push(`<room>\n${roomName}: ${roomDesc}\n</room>`);
   if (opts.sourceEntity) {
-    const name = (opts.sourceEntity.properties["name"] as string) || opts.sourceEntity.id;
-    const desc = (opts.sourceEntity.properties["description"] as string) || "";
+    const name = opts.sourceEntity.name;
+    const desc = opts.sourceEntity.description;
     parts.push(`<source-object>\n${name}: ${desc}\n</source-object>`);
   }
   if (opts.recentOutput) {
@@ -127,7 +127,7 @@ function wordVariants(word: string): string[] {
 
 /** Check if a word (or a plural/singular variant) appears in the room description */
 export function isSceneryWord(word: string, room: Entity): boolean {
-  const description = (room.properties["description"] as string) || "";
+  const description = room.description;
   const lower = description.toLowerCase();
   const variants = wordVariants(word);
   for (const variant of variants) {
@@ -147,8 +147,8 @@ export function isItemSceneryWord(
   const candidates = [...store.getContents(roomId), ...store.getContents(playerId)];
   const lower = word.toLowerCase();
   for (const entity of candidates) {
-    if (entity.tags.has("exit") || entity.tags.has("player")) continue;
-    const desc = (entity.properties["description"] as string) || "";
+    if (entity.tags.includes("exit") || entity.tags.includes("player")) continue;
+    const desc = entity.description;
     if (!desc) continue;
     const escaped = lower.replace(/[$()*+.?[\\\]^{|}]/g, "\\$&");
     // eslint-disable-next-line security/detect-non-literal-regexp -- escaped above
@@ -165,18 +165,20 @@ export function isExamineVerb(verb: string): boolean {
   return EXAMINE_VERBS.has(verb);
 }
 
-function isSceneryEntry(s: SceneryEntry | string): s is SceneryEntry {
-  return typeof s !== "string" && !!s.word;
+/** Get the scenery array from an entity — rooms use .room.scenery, items use properties */
+function getSceneryArray(entity: Entity): SceneryEntry[] {
+  if (entity.room) return entity.room.scenery;
+  const raw = entity.properties["scenery"] as SceneryEntry[] | undefined;
+  return raw || [];
 }
 
 /** Get stored scenery entry for a word, if it exists (checks word and aliases) */
-export function getStoredScenery(room: Entity, word: string): SceneryEntry | null {
-  const scenery = room.properties["scenery"] as Array<SceneryEntry | string> | undefined;
-  if (!scenery) return null;
+export function getStoredScenery(entity: Entity, word: string): SceneryEntry | null {
+  const scenery = getSceneryArray(entity);
+  if (scenery.length === 0) return null;
   const lower = word.toLowerCase();
-  const entries = scenery.filter(isSceneryEntry);
   return (
-    entries.find((s) => {
+    scenery.find((s) => {
       if (s.word.toLowerCase() === lower) return true;
       if (s.aliases) {
         return s.aliases.some((a) => a.toLowerCase() === lower);
@@ -191,12 +193,13 @@ export function removeMatchingScenery(
   store: EntityStore,
   { room, name, aliases }: { room: Entity; name: string; aliases: string[] },
 ): void {
-  const scenery = room.properties["scenery"] as SceneryEntry[] | undefined;
-  if (!scenery || scenery.length === 0) return;
+  if (!room.room) return;
+  const scenery = room.room.scenery;
+  if (scenery.length === 0) return;
   const words = new Set([name.toLowerCase(), ...aliases.map((a) => a.toLowerCase())]);
   const filtered = scenery.filter((s) => !words.has(s.word.toLowerCase()));
   if (filtered.length < scenery.length) {
-    store.setProperty(room.id, { name: "scenery", value: filtered });
+    room.room.scenery = filtered;
   }
 }
 
@@ -258,8 +261,12 @@ export async function generateSceneryDescription(
   };
 
   // Store scenery on the source entity (or room if no specific source)
-  const prior = (storeOn.properties["scenery"] as SceneryEntry[]) || [];
-  store.setProperty(storeOn.id, { name: "scenery", value: [...prior, entry] });
+  if (storeOn.room) {
+    storeOn.room.scenery = [...storeOn.room.scenery, entry];
+  } else {
+    const prior = (storeOn.properties["scenery"] as SceneryEntry[]) || [];
+    store.setProperty(storeOn.id, { name: "scenery", value: [...prior, entry] });
+  }
 
   return {
     entry,

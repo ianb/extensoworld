@@ -31,11 +31,9 @@ function findVisibleEntities(
 
 function getEntityNames(entity: Entity): string[] {
   const names: string[] = [];
-  const primary = (entity.properties["name"] as string) || "";
-  if (primary) names.push(primary);
-  const aliases = entity.properties["aliases"] as string[] | undefined;
-  if (aliases) {
-    names.push(...aliases);
+  if (entity.name) names.push(entity.name);
+  if (entity.aliases.length > 0) {
+    names.push(...entity.aliases);
   }
   return names;
 }
@@ -78,7 +76,7 @@ function matchEntityByName(
 
 /** When multiple entities match, prefer one the player is carrying */
 function preferHeld(matches: Entity[], playerId: string): Entity | null {
-  const held = matches.filter((e) => e.properties["location"] === playerId);
+  const held = matches.filter((e) => e.location === playerId);
   if (held.length === 1) return held[0]!;
   return null;
 }
@@ -97,7 +95,7 @@ function resolveObject(
   if (result instanceof AmbiguousObjectError) {
     const held = preferHeld(result.matches, playerId);
     if (held) return held;
-    const names = result.matches.map((m) => (m.properties["name"] as string) || m.id);
+    const names = result.matches.map((m) => m.name);
     return `Which "${name}" do you mean? ${names.join(", ")}`;
   }
   if (!result) return `{!You don't see "${name}" here.!}`;

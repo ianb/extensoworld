@@ -86,7 +86,7 @@ function dispatchEncounters(
   const allEvents: WorldEvent[] = [];
   for (const entity of contents) {
     if (entity.id === player.id) continue;
-    if (entity.tags.has("exit")) continue;
+    if (entity.tags.includes("exit")) continue;
     const context: VerbContext = {
       store,
       command: { form: "transitive", verb: SYSTEM_VERBS.ENCOUNTER, object: entity },

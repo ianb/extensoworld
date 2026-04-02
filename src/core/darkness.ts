@@ -5,11 +5,8 @@ export function isRoomLit(
   store: EntityStore,
   { room, playerId }: { room: Entity; playerId: string },
 ): boolean {
-  // Room itself is lit (aboveground or has its own light)
-  if (room.properties["lit"] === true) return true;
-
-  // Room is not dark by default
-  if (room.properties["dark"] !== true) return true;
+  // Room is not dark by default — only rooms with darkWhenUnlit need a light source
+  if (!room.room || !room.room.darkWhenUnlit) return true;
 
   // Check if player or room contains a lit item
   if (hasLightSource(store, playerId)) return true;
@@ -22,7 +19,7 @@ export function isRoomLit(
 function hasLightSource(store: EntityStore, entityId: string): boolean {
   const contents = store.getContentsDeep(entityId);
   for (const item of contents) {
-    if (item.properties["lit"] === true) return true;
+    if (item.properties.lit) return true;
   }
   return false;
 }

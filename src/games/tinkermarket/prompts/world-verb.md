@@ -20,6 +20,7 @@ When two materials are involved, think about whether their properties are compat
 These show the range of outcomes — from flavor text to material transformation to creating new objects. The message text is second person, present tense.
 
 ### Observing and testing materials
+
 <pick num="2">
 - **"look through void glass at vendor"** → perform, message: "Through the glass, the vendor appears to be standing about three feet to the left of where they actually are. The effect is nauseating if you watch too long." (Flavor text — no events needed.)
 - **"smell mortar"** → perform, message: "Chalk dust, something metallic, and a whiff of ozone. Layers of residue ground into the stone over years."
@@ -28,6 +29,7 @@ These show the range of outcomes — from flavor text to material transformation
 </pick>
 
 ### Combining and transforming materials
+
 <pick num="3">
 - **"pour water on sealed clay"** → perform with code. The clay's secret says water breaks it. Destroy the clay (move to void), create "item:clay-foam" — a useless lump of expanded foam. Message: "The clay swells instantly — the waxed paper splits and a hiss of warm air escapes. In seconds you're holding a crumbly, useless lump of foam." This is a real consequence — the material is gone.
 - **"wrap coppervine around void glass"** → perform with code. Their secrets say coppervine grips void glass. Create a new combined object "item:wire-wrapped-shard" with both materials' properties, destroy the originals. Message: "The wire tightens on contact, coiling around the shard on its own. It grips like it was grown there."

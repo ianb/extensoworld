@@ -1,13 +1,9 @@
 import type { EntityStore, Entity } from "./entity.js";
 import { renderTemplate } from "./templates.js";
 
-function entityName(entity: Entity): string {
-  return (entity.properties["name"] as string) || entity.id;
-}
-
 /** Mark an entity name for highlighting in output: {{id|Name}} */
 export function entityRef(entity: Entity): string {
-  return `{{${entity.id}|${entityName(entity)}}}`;
+  return `{{${entity.id}|${entity.name}}}`;
 }
 
 /**
@@ -15,7 +11,7 @@ export function entityRef(entity: Entity): string {
  * Uses shortDescription template if set, otherwise falls back to entityRef.
  */
 export function itemDisplay(entity: Entity, store: EntityStore): string {
-  const short = entity.properties["shortDescription"] as string | undefined;
+  const short = entity.properties.shortDescription;
   if (short) {
     const rendered = renderTemplate(short, { entity, store });
     return `{{${entity.id}|${rendered}}}`;
@@ -28,29 +24,27 @@ export function describeRoomFull(
   { room, playerId }: { room: Entity; playerId: string },
 ): string {
   const name = entityRef(room);
-  const rawDescription = (room.properties["description"] as string) || "";
-  const description = renderTemplate(rawDescription, { entity: room, store });
+  const description = renderTemplate(room.description, { entity: room, store });
   const contents = store.getContents(room.id);
 
-  const exits = contents.filter((e) => e.tags.has("exit"));
+  const exits = contents.filter((e) => e.tags.includes("exit"));
   const exitDescs = exits.map((e) => {
-    const dir = (e.properties["direction"] as string) || "?";
-    const short = e.properties["shortDescription"] as string | undefined;
+    const dir = (e.exit && e.exit.direction) || "?";
+    const short = e.properties.shortDescription;
     if (short) {
       const rendered = renderTemplate(short, { entity: e, store });
       return `<<${dir}>> (${rendered})`;
     }
-    const exitName = e.properties["name"] as string | undefined;
-    if (exitName) {
-      return `<<${dir}>> (${exitName})`;
+    if (e.name && e.name !== e.id) {
+      return `<<${dir}>> (${e.name})`;
     }
     return `<<${dir}>>`;
   });
   const exitList = exitDescs.length > 0 ? exitDescs.join(", ") : "none";
 
-  const nonExits = contents.filter((e) => !e.tags.has("exit") && e.id !== playerId);
-  const npcs = nonExits.filter((e) => e.tags.has("npc"));
-  const items = nonExits.filter((e) => !e.tags.has("npc"));
+  const nonExits = contents.filter((e) => !e.tags.includes("exit") && e.id !== playerId);
+  const npcs = nonExits.filter((e) => e.tags.includes("npc"));
+  const items = nonExits.filter((e) => !e.tags.includes("npc"));
   const parts = [`${name}\n\n${description}`];
 
   if (npcs.length > 0) {
@@ -63,8 +57,8 @@ export function describeRoomFull(
   if (items.length > 0) {
     const itemDescs = items.map((e) => {
       const display = itemDisplay(e, store);
-      if (e.tags.has("container") && e.tags.has("openable")) {
-        return e.properties["open"] === true ? `${display} (open)` : `${display} (closed)`;
+      if (e.tags.includes("container") && e.tags.includes("openable")) {
+        return e.properties.open ? `${display} (open)` : `${display} (closed)`;
       }
       return display;
     });

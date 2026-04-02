@@ -150,7 +150,7 @@ export class ColossalCaveLib extends HandlerLib {
 
   /** Add points to the player's score (mutates immediately) */
   addScore(delta: number): void {
-    const current = (this.player.properties["score"] as number) || 0;
+    const current = this.player.properties.score || 0;
     this.store.setProperty(this.player.id, { name: "score", value: current + delta });
   }
 
@@ -174,12 +174,25 @@ export class ColossalCaveLib extends HandlerLib {
 
   // --- Entity creation (for crystal bridge) ---
 
-  /** Create a new entity in the store */
+  /** Create a new entity in the store (accepts legacy properties format) */
   createEntity(
     id: string,
     { tags, properties }: { tags: string[]; properties: Record<string, unknown> },
   ): Entity {
-    return this.store.create(id, { tags, properties });
+    const opts: Record<string, unknown> = { tags };
+    const rest: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(properties)) {
+      if (k === "name" || k === "description" || k === "location") {
+        opts[k] = v;
+      } else if (k === "direction" || k === "destination" || k === "destinationIntent") {
+        if (!opts["exit"]) opts["exit"] = {};
+        (opts["exit"] as Record<string, unknown>)[k] = v;
+      } else {
+        rest[k] = v;
+      }
+    }
+    if (Object.keys(rest).length > 0) opts["properties"] = rest;
+    return this.store.create(id, opts as Parameters<typeof this.store.create>[1]);
   }
 }
 

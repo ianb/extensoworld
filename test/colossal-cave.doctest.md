@@ -191,7 +191,7 @@ Attack the dragon and confirm with yes:
 
 ```
 const game = colossalCave();
-game.runner.store.setProperty("player:1", { name: "location", value: "room:in-secret-canyon" });
+game.runner.store.setLocation("player:1", "room:in-secret-canyon");
 game.do("attack dragon")
 => With what? Your bare hands?
 ```
@@ -221,8 +221,8 @@ Give a treasure to the troll to make him leave:
 
 ```
 const tg = colossalCave();
-tg.runner.store.setProperty("player:1", { name: "location", value: "room:on-sw-side-of-chasm" });
-tg.runner.store.setProperty("item:eggs", { name: "location", value: "player:1" });
+tg.runner.store.setLocation("player:1", "room:on-sw-side-of-chasm");
+tg.runner.store.setLocation("item:eggs", "player:1");
 tg.do("give eggs to troll");
 tg.locationOf("item:troll")
 => void
@@ -234,9 +234,9 @@ Feed the bear to make it friendly, then unlock the chain:
 
 ```
 const bg = colossalCave();
-bg.runner.store.setProperty("player:1", { name: "location", value: "room:in-barren-room" });
-bg.runner.store.setProperty("item:food", { name: "location", value: "player:1" });
-bg.runner.store.setProperty("item:keys", { name: "location", value: "player:1" });
+bg.runner.store.setLocation("player:1", "room:in-barren-room");
+bg.runner.store.setLocation("item:food", "player:1");
+bg.runner.store.setLocation("item:keys", "player:1");
 bg.do("give food to bear");
 bg.prop("item:bear", "friendly")
 => true
@@ -254,8 +254,8 @@ The lantern drains power each turn:
 
 ```
 const lg = colossalCave();
-lg.runner.store.setProperty("player:1", { name: "location", value: "room:inside-building" });
-lg.runner.store.setProperty("item:lantern", { name: "location", value: "player:1" });
+lg.runner.store.setLocation("player:1", "room:inside-building");
+lg.runner.store.setLocation("item:lantern", "player:1");
 lg.do("turn lamp");
 const before = lg.prop("item:lantern", "powerRemaining");
 lg.do("east");
@@ -270,8 +270,8 @@ Wave the rod at the fissure to create a bridge:
 
 ```
 const fg = colossalCave();
-fg.runner.store.setProperty("player:1", { name: "location", value: "room:on-east-bank-of-fissure" });
-fg.runner.store.setProperty("item:rod", { name: "location", value: "player:1" });
+fg.runner.store.setLocation("player:1", "room:on-east-bank-of-fissure");
+fg.runner.store.setLocation("item:rod", "player:1");
 fg.do("wave rod")
 => A crystal bridge now spans the fissure.
 ```

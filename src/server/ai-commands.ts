@@ -26,7 +26,7 @@ function describeCurrentRoom(store: EntityStore): string {
   const players = store.findByTag("player");
   const player = players[0];
   if (!player) return "No player found.";
-  const roomId = player.properties["location"] as string;
+  const roomId = player.location;
   const room = store.get(roomId);
   if (!isRoomLit(store, { room, playerId: player.id })) {
     return darknessDescription();
@@ -53,7 +53,7 @@ export async function handleAiCreateExitCommand(
   const players = store.findByTag("player");
   const player = players[0];
   if (!player) return { output: "No player found." };
-  const roomId = player.properties["location"] as string;
+  const roomId = player.location;
   const room = store.get(roomId);
   const result = await handleAiCreateExit(store, {
     instructions,
@@ -102,7 +102,7 @@ export async function handleAiCreateCommand(
   const players = store.findByTag("player");
   const player = players[0];
   if (!player) return { output: "No player found." };
-  const roomId = player.properties["location"] as string;
+  const roomId = player.location;
   const room = store.get(roomId);
   const result = await handleAiCreate(store, {
     description,
@@ -160,7 +160,7 @@ export async function handleUnresolvedExit(
   });
 
   // Move the player to the new room (session event — cleared on reset)
-  store.setProperty(context.player.id, { name: "location", value: result.roomId });
+  store.setLocation(context.player.id, result.roomId);
   const moveEvent: WorldEvent = {
     type: "set-property",
     entityId: context.player.id,

@@ -16,8 +16,8 @@ export async function handleAiDestroyCommand(
   for (const id of aiIds) {
     if (!store.has(id)) continue;
     const entity = store.get(id);
-    const name = ((entity.properties["name"] as string) || "").toLowerCase();
-    const aliases = (entity.properties["aliases"] as string[]) || [];
+    const name = (entity.name || "").toLowerCase();
+    const aliases = entity.aliases;
     if (
       name === objectName ||
       id === objectName ||
@@ -34,7 +34,7 @@ export async function handleAiDestroyCommand(
     return { output: `No AI-created object matching "${objectName}" found.${hint}` };
   }
   const entity = store.get(match);
-  const entityName = (entity.properties["name"] as string) || match;
+  const entityName = entity.name || match;
   store.delete(match);
   await storage.removeAiEntity(gameId, match);
   return { output: `[Destroyed ${entityName} (${match})]` };

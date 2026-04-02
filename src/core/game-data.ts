@@ -73,11 +73,31 @@ export interface PropertyData {
   defaultValue?: unknown;
 }
 
-/** Entity definition in data format */
+/** Entity definition in data format (matches JSONL file structure) */
 export interface EntityData {
   id: string;
   tags: string[];
-  properties: Record<string, unknown>;
+  name: string;
+  description: string;
+  location: string;
+  aliases?: string[];
+  secret?: string;
+  exit?: {
+    direction: string;
+    destination?: string;
+    destinationIntent?: string;
+  };
+  room?: {
+    darkWhenUnlit?: boolean;
+    visits?: number;
+    scenery?: Array<{ word: string; aliases?: string[]; description: string; rejection: string }>;
+    grid?: { x: number; y: number; z: number };
+  };
+  ai?: {
+    prompt?: string;
+    conversationPrompt?: string;
+  };
+  properties?: Record<string, unknown>;
 }
 
 /**

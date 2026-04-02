@@ -26,14 +26,12 @@ export function renderTemplate(
   }
 
   function has(tag: string): boolean {
-    return entity.tags.has(tag);
+    return entity.tags.includes(tag);
   }
 
   function contents(): string[] {
     const children = store.getContents(entity.id);
-    return children
-      .filter((e) => !e.tags.has("exit"))
-      .map((e) => (e.properties["name"] as string) || e.id);
+    return children.filter((e) => !e.tags.includes("exit")).map((e) => e.name);
   }
 
   try {

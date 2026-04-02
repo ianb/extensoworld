@@ -87,13 +87,13 @@ Rooms track how many times the player has entered:
 ```
 const g7 = testWorld();
 g7.walk("north");
-g7.prop("room:deep-woods", "visits")
+g7.runner.store.get("room:deep-woods").room.visits
 => 1
 ```
 
 ``` continue
 g7.walk("south", "north");
-g7.prop("room:deep-woods", "visits")
+g7.runner.store.get("room:deep-woods").room.visits
 => 2
 ```
 

@@ -92,6 +92,14 @@ export function loadGameData(data: GameData, options?: LoadGameOptions): LoadedG
   for (const entityData of data.entities) {
     store.create(entityData.id, {
       tags: entityData.tags,
+      name: entityData.name,
+      description: entityData.description,
+      location: entityData.location,
+      aliases: entityData.aliases,
+      secret: entityData.secret,
+      exit: entityData.exit,
+      room: entityData.room,
+      ai: entityData.ai,
       properties: entityData.properties,
     });
   }

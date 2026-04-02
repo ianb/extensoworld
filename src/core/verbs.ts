@@ -1,4 +1,5 @@
 import type { Entity } from "./entity.js";
+import { applySingleEvent } from "./apply-event.js";
 import type {
   ResolvedCommand,
   WorldEvent,
@@ -72,26 +73,7 @@ export class VerbRegistry {
     try {
       result = performer.perform(context);
       for (const event of result.events) {
-        if (event.type === "create-entity") {
-          if (!context.store.has(event.entityId)) {
-            const data = event.value as { tags: string[]; properties: Record<string, unknown> };
-            context.store.create(event.entityId, {
-              tags: data.tags,
-              properties: data.properties,
-            });
-          }
-        } else if (event.type === "set-property") {
-          if (event.property) {
-            context.store.setProperty(event.entityId, {
-              name: event.property,
-              value: event.value,
-            });
-          }
-        } else if (event.type === "remove-property") {
-          if (event.property) {
-            context.store.removeProperty(event.entityId, event.property);
-          }
-        }
+        applySingleEvent(context.store, event);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -138,22 +120,7 @@ export class VerbRegistry {
       }
       for (const event of result.events) {
         allEvents.push(event);
-        if (event.type === "create-entity") {
-          if (!systemContext.store.has(event.entityId)) {
-            const data = event.value as { tags: string[]; properties: Record<string, unknown> };
-            systemContext.store.create(event.entityId, {
-              tags: data.tags,
-              properties: data.properties,
-            });
-          }
-        } else if (event.type === "set-property" && event.property) {
-          systemContext.store.setProperty(event.entityId, {
-            name: event.property,
-            value: event.value,
-          });
-        } else if (event.type === "remove-property" && event.property) {
-          systemContext.store.removeProperty(event.entityId, event.property);
-        }
+        applySingleEvent(systemContext.store, event);
       }
     }
     return { outputs, events: allEvents };
@@ -251,7 +218,7 @@ export class VerbRegistry {
   private meetsRequirements(entity: Entity, reqs: EntityRequirements): boolean {
     if (reqs.tags) {
       for (const tag of reqs.tags) {
-        if (!entity.tags.has(tag)) return false;
+        if (!entity.tags.includes(tag)) return false;
       }
     }
     if (reqs.properties) {
@@ -285,10 +252,10 @@ export class VerbRegistry {
 
   private involvesTag(command: ResolvedCommand, tag: string): boolean {
     if (command.form === "transitive" || command.form === "prepositional") {
-      return command.object.tags.has(tag);
+      return command.object.tags.includes(tag);
     }
     if (command.form === "ditransitive") {
-      return command.object.tags.has(tag) || command.indirect.tags.has(tag);
+      return command.object.tags.includes(tag) || command.indirect.tags.includes(tag);
     }
     return false;
   }

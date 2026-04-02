@@ -9,7 +9,7 @@ import { composeVerbPrompt, composeCreatePrompt, composeConversationPrompt } fro
 import type { GameInstance } from "../games/registry.js";
 import { getGame, listGames, isValidGameId } from "../games/registry.js";
 import { executeCommand } from "./execute-command.js";
-import type { SessionKey } from "./storage.js";
+import type { SessionKey, AiEntityRecord } from "./storage.js";
 import { logErrorObj } from "./error-log.js";
 
 // Game registrations are imported by the entry point (server/index.ts or worker.ts)
@@ -25,38 +25,38 @@ class GameNotFoundError extends Error {
   }
 }
 
-/** Normalize scenery: strip plain strings, keep only structured SceneryEntry objects */
-function normalizeScenery(props: Record<string, unknown>): void {
-  const scenery = props["scenery"];
-  if (!Array.isArray(scenery)) return;
-  const valid = scenery.filter(
-    (s): s is { word: string } => typeof s === "object" && s !== null && typeof s.word === "string",
-  );
-  if (valid.length === 0) {
-    delete props["scenery"];
-  } else if (valid.length < scenery.length) {
-    props["scenery"] = valid;
-  }
-}
-
 /** Apply AI entity records to the store (create or update) */
-function applyAiEntities(
-  records: Array<{ id: string; tags: string[]; properties: Record<string, unknown> }>,
-  store: EntityStore,
-): void {
+function applyAiEntities(records: AiEntityRecord[], store: EntityStore): void {
   for (const record of records) {
-    if ("scenery" in record.properties) normalizeScenery(record.properties);
     if (store.has(record.id)) {
-      for (const [key, value] of Object.entries(record.properties)) {
-        if (value === null) {
-          store.removeProperty(record.id, key);
-        } else {
-          store.setProperty(record.id, { name: key, value });
+      const entity = store.get(record.id);
+      entity.name = record.name;
+      entity.description = record.description;
+      if (record.aliases) entity.aliases = record.aliases;
+      if (record.secret !== undefined) entity.secret = record.secret;
+      if (record.exit) entity.exit = record.exit;
+      if (record.room) entity.room = { ...entity.room, ...record.room } as typeof entity.room;
+      if (record.ai) entity.ai = record.ai;
+      if (record.properties) {
+        for (const [key, value] of Object.entries(record.properties)) {
+          if (value === null) {
+            store.removeProperty(record.id, key);
+          } else {
+            store.setProperty(record.id, { name: key, value });
+          }
         }
       }
     } else {
       store.create(record.id, {
         tags: record.tags,
+        name: record.name,
+        description: record.description,
+        location: record.location,
+        aliases: record.aliases,
+        secret: record.secret,
+        exit: record.exit,
+        room: record.room,
+        ai: record.ai,
         properties: record.properties,
       });
     }
@@ -76,9 +76,10 @@ async function initGame(session: SessionKey): Promise<GameInstance> {
   // Mark the starting room as visited so the map includes it
   const startPlayer = instance.store.findByTag("player")[0];
   if (startPlayer) {
-    const startRoomId = startPlayer.properties["location"] as string;
+    const startRoomId = startPlayer.location;
     if (startRoomId && instance.store.has(startRoomId)) {
-      instance.store.setProperty(startRoomId, { name: "visits", value: 1 });
+      const startRoom = instance.store.get(startRoomId);
+      if (startRoom.room) startRoom.room.visits = 1;
     }
   }
   // Events are per-user
@@ -117,7 +118,7 @@ function describeCurrentRoom(s: EntityStore): string {
   const players = s.findByTag("player");
   const player = players[0];
   if (!player) return "No player found.";
-  const roomId = player.properties["location"] as string;
+  const roomId = player.location;
   const room = s.get(roomId);
   return describeRoomFull(s, { room, playerId: player.id });
 }
@@ -181,7 +182,7 @@ export const appRouter = router({
     const game = await getOrCreateGame(session);
     const ids = game.store.getAllIds();
     const players = game.store.findByTag("player");
-    const playerRoomId = players[0] ? (players[0].properties["location"] as string) || null : null;
+    const playerRoomId = players[0] ? players[0].location || null : null;
     const items = ids.map((id) => {
       const snap = game.store.getSnapshot(id);
       const initial = game.store.getInitialState(id);
@@ -189,9 +190,9 @@ export const appRouter = router({
         initial !== null && JSON.stringify(snap.properties) !== JSON.stringify(initial.properties);
       return {
         id: snap.id,
-        name: (snap.properties["name"] as string) || snap.id,
+        name: snap.name,
         tags: snap.tags,
-        location: (snap.properties["location"] as string) || null,
+        location: snap.location || null,
         hasChanges,
       };
     });
@@ -215,18 +216,18 @@ export const appRouter = router({
     const store = game.store;
     const players = store.findByTag("player");
     const player = players[0];
-    const currentRoomId = player ? (player.properties["location"] as string) || "" : "";
+    const currentRoomId = player ? player.location || "" : "";
     const roomIds = store.findByTag("room").map((r) => r.id);
     const rooms = roomIds.map((id) => {
       const room = store.get(id);
       const exits = store.getExits(id);
       return {
         id,
-        name: (room.properties["name"] as string) || id,
-        visits: (room.properties["visits"] as number) || 0,
+        name: room.name,
+        visits: (room.room && room.room.visits) || 0,
         exits: exits.map((e) => ({
-          direction: (e.properties["direction"] as string) || "",
-          destinationId: (e.properties["destination"] as string) || null,
+          direction: (e.exit && e.exit.direction) || "",
+          destinationId: (e.exit && e.exit.destination) || null,
         })),
       };
     });
@@ -251,18 +252,18 @@ export const appRouter = router({
         regionConversation: null,
         room: null,
       };
-    const roomId = player.properties["location"] as string;
+    const roomId = player.location;
     const room = game.store.get(roomId);
     const promptCtx = { prompts: game.prompts, room, store: game.store };
-    const roomPrompt = (room.properties["aiPrompt"] as string) || null;
-    const regionId = room.properties["location"] as string | undefined;
+    const roomPrompt = (room.ai && room.ai.prompt) || null;
+    const regionId = room.location;
     let regionPrompt: string | null = null;
     let regionConversationPrompt: string | null = null;
     if (regionId && regionId !== "world" && game.store.has(regionId)) {
       const region = game.store.get(regionId);
-      if (region.tags.has("region")) {
-        regionPrompt = (region.properties["aiPrompt"] as string) || null;
-        regionConversationPrompt = (region.properties["aiConversationPrompt"] as string) || null;
+      if (region.tags.includes("region")) {
+        regionPrompt = (region.ai && region.ai.prompt) || null;
+        regionConversationPrompt = (region.ai && region.ai.conversationPrompt) || null;
       }
     }
     return {

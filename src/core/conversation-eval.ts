@@ -80,7 +80,7 @@ export function applyConversationEffects(
         description: effect.description || `Set ${effect.property}`,
       });
     } else if (effect.type === "move" && effect.property === "location") {
-      store.setProperty(entityId, { name: "location", value: effect.value });
+      store.setLocation(entityId, effect.value as string);
       events.push({
         type: "set-property",
         entityId,

@@ -31,6 +31,10 @@ export interface MovementResult {
   unresolvedExit?: UnresolvedExitContext;
 }
 
+function exitDirection(e: Entity): string {
+  return (e.exit && e.exit.direction) || "";
+}
+
 export function tryMovement(store: EntityStore, input: string): MovementResult | null {
   const trimmed = input.trim().toLowerCase();
   let direction: string;
@@ -47,7 +51,7 @@ export function tryMovement(store: EntityStore, input: string): MovementResult |
     } else {
       const room = getPlayerRoom(store);
       const exits = store.getExits(room.id);
-      const directMatch = exits.find((ex) => ex.properties["direction"] === trimmed);
+      const directMatch = exits.find((ex) => exitDirection(ex) === trimmed);
       if (!directMatch) return null;
       direction = trimmed;
     }
@@ -55,19 +59,16 @@ export function tryMovement(store: EntityStore, input: string): MovementResult |
 
   const room = getPlayerRoom(store);
   const exits = store.getExits(room.id);
-  const exit = exits.find((e) => e.properties["direction"] === direction);
+  const exit = exits.find((e) => exitDirection(e) === direction);
 
   if (exit) {
-    if (exit.properties["locked"] === true) {
-      const exitName = (exit.properties["name"] as string) || "way";
+    if (exit.properties.locked) {
+      const exitName = exit.name !== exit.id ? exit.name : "way";
       return { output: `{!The ${exitName} is locked.!}`, direction, moved: false, events: [] };
     }
     // Unresolved exit — has intent but no destination yet
-    if (
-      typeof exit.properties["destinationIntent"] === "string" &&
-      typeof exit.properties["destination"] !== "string"
-    ) {
-      const exitName = (exit.properties["name"] as string) || `the way ${direction}`;
+    if (exit.exit && exit.exit.destinationIntent && !exit.exit.destination) {
+      const exitName = exit.name !== exit.id ? exit.name : `the way ${direction}`;
       return {
         output: `{!${exitName} leads somewhere, but the way is not yet clear.!}`,
         direction,
@@ -77,7 +78,7 @@ export function tryMovement(store: EntityStore, input: string): MovementResult |
       };
     }
     const events: WorldEvent[] = [];
-    if (exit.tags.has("openable") && exit.properties["open"] !== true) {
+    if (exit.tags.includes("openable") && !exit.properties.open) {
       events.push({
         type: "set-property",
         entityId: exit.id,
@@ -85,7 +86,7 @@ export function tryMovement(store: EntityStore, input: string): MovementResult |
         value: true,
         description: "Auto-opened door",
       });
-      const pairedId = exit.properties["pairedDoor"] as string | undefined;
+      const pairedId = exit.properties.pairedDoor;
       if (pairedId && store.has(pairedId)) {
         events.push({
           type: "set-property",
@@ -96,18 +97,20 @@ export function tryMovement(store: EntityStore, input: string): MovementResult |
         });
       }
     }
-    const destination = exit.properties["destination"] as string;
+    const destination = (exit.exit && exit.exit.destination) || "";
     const player = getPlayer(store);
     events.push({
       type: "set-property",
       entityId: player.id,
       property: "location",
       value: destination,
-      oldValue: player.properties["location"],
+      oldValue: player.location,
       description: `Moved ${direction}`,
     });
     for (const event of events) {
-      if (event.property) {
+      if (event.property === "location") {
+        store.setLocation(event.entityId, event.value as string);
+      } else if (event.property) {
         store.setProperty(event.entityId, { name: event.property, value: event.value });
       }
     }
@@ -120,7 +123,7 @@ export function tryMovement(store: EntityStore, input: string): MovementResult |
   }
 
   if (isExplicitGo) {
-    const exitDirs = exits.map((e) => e.properties["direction"] as string);
+    const exitDirs = exits.map((e) => exitDirection(e));
     return {
       output: `{!You can't go ${direction}. Available exits: ${exitDirs.join(", ")}!}`,
       direction,
@@ -143,8 +146,7 @@ export function getPlayer(store: EntityStore): Entity {
 
 export function getPlayerRoom(store: EntityStore): Entity {
   const player = getPlayer(store);
-  const roomId = player.properties["location"] as string;
-  return store.get(roomId);
+  return store.get(player.location);
 }
 
 class PlayerNotFoundError extends Error {

@@ -26,9 +26,9 @@ Scenery entries can have aliases that match in addition to the primary word:
 const store = makeStore();
 store.create("room:test", {
   tags: ["room"],
-  properties: {
-    name: "Test Room",
-    description: "A test room.",
+  name: "Test Room",
+  description: "A test room.",
+  room: {
     scenery: [
       {
         word: "c-4",
@@ -92,18 +92,14 @@ Words in item descriptions can be treated as scenery when the item is visible:
 const store2 = makeStore();
 store2.create("room:bay", {
   tags: ["room"],
-  properties: {
-    name: "Hibernation Bay",
-    description: "A chamber with pods.",
-  },
+  name: "Hibernation Bay",
+  description: "A chamber with pods.",
 });
 store2.create("item:suit", {
   tags: ["portable"],
-  properties: {
-    name: "Vapor Suit",
-    location: "room:bay",
-    description: "A jumpsuit with a hidden pocket in the lining near the hip.",
-  },
+  name: "Vapor Suit",
+  location: "room:bay",
+  description: "A jumpsuit with a hidden pocket in the lining near the hip.",
 });
 ```
 

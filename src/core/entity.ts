@@ -1,4 +1,4 @@
-import type { PropertyRegistry, PropertyBag, PropertyDefinition } from "./properties.js";
+import type { PropertyRegistry, PropertyDefinition } from "./properties.js";
 import { validateValue } from "./properties.js";
 import { SeededRandom } from "./random.js";
 import {
@@ -9,27 +9,20 @@ import {
   DanglingReferenceError,
   PropertyValueError,
 } from "./entity-errors.js";
+import type { Entity, EntitySnapshot, CreateEntityOptions } from "./entity-types.js";
+import { snapshotEntity, entityFromSnapshot } from "./entity-types.js";
 
-export interface Entity {
-  id: string;
-  tags: Set<string>;
-  properties: PropertyBag;
-}
+export type {
+  EntityId,
+  SceneryEntry,
+  Entity,
+  EntitySnapshot,
+  CreateEntityOptions,
+} from "./entity-types.js";
+export { snapshotEntity, entityFromSnapshot } from "./entity-types.js";
 
 export const VOID_LOCATION = "void";
 export const WORLD_LOCATION = "world";
-
-interface CreateEntityOptions {
-  tags?: string[];
-  properties?: PropertyBag;
-}
-
-/** Serializable snapshot of an entity's state */
-export interface EntitySnapshot {
-  id: string;
-  tags: string[];
-  properties: PropertyBag;
-}
 
 export class EntityStore {
   private entities: Map<string, Entity> = new Map();
@@ -44,36 +37,23 @@ export class EntityStore {
     this.random = new SeededRandom(seed);
   }
 
-  /** Save the current state of all entities as the baseline for diff tracking */
   snapshot(): void {
     this.initialState.clear();
     for (const entity of this.entities.values()) {
-      this.initialState.set(entity.id, {
-        id: entity.id,
-        tags: Array.from(entity.tags),
-        properties: { ...entity.properties },
-      });
+      this.initialState.set(entity.id, snapshotEntity(entity));
     }
   }
 
-  /** Get the initial snapshot of an entity, or null if it was created after snapshot */
   getInitialState(id: string): EntitySnapshot | null {
     return this.initialState.get(id) || null;
   }
 
-  /** Get all entity IDs */
   getAllIds(): string[] {
     return Array.from(this.entities.keys());
   }
 
-  /** Get a serializable snapshot of an entity's current state */
   getSnapshot(id: string): EntitySnapshot {
-    const entity = this.get(id);
-    return {
-      id: entity.id,
-      tags: Array.from(entity.tags),
-      properties: { ...entity.properties },
-    };
+    return snapshotEntity(this.get(id));
   }
 
   generateId(prefix: string): string {
@@ -89,130 +69,136 @@ export class EntityStore {
     if (this.entities.has(id)) {
       throw new DuplicateEntityError(id);
     }
-    // Validate all initial properties against the registry — strip null/undefined
     const rawProps = options.properties || {};
     const props: Record<string, unknown> = {};
     for (const [propName, propValue] of Object.entries(rawProps)) {
-      if (propValue === null || propValue === undefined) {
-        continue;
-      }
+      if (propValue === null || propValue === undefined) continue;
       const def = this.registry.definitions[propName];
-      if (!def) {
-        throw new UndefinedPropertyError(propName);
-      }
+      if (!def) throw new UndefinedPropertyError(propName);
       const errors = validateValue(this.registry, { name: propName, value: propValue });
-      if (errors.length > 0) {
-        throw new PropertyValueError(propName, errors);
-      }
+      if (errors.length > 0) throw new PropertyValueError(propName, errors);
       props[propName] = propValue;
     }
 
     const entity: Entity = {
       id,
-      tags: new Set(options.tags || []),
+      tags: options.tags ? [...options.tags] : [],
+      name: options.name || id,
+      description: options.description || "",
+      location: options.location || VOID_LOCATION,
+      aliases: options.aliases ? [...options.aliases] : [],
       properties: { ...props },
     };
+    if (options.secret !== undefined) entity.secret = options.secret;
+    if (options.exit) {
+      entity.exit = {
+        direction: options.exit.direction,
+        destination: options.exit.destination,
+        destinationIntent: options.exit.destinationIntent,
+      };
+    }
+    if (options.room) {
+      entity.room = {
+        darkWhenUnlit: options.room.darkWhenUnlit || false,
+        visits: options.room.visits || 0,
+        scenery: options.room.scenery ? [...options.room.scenery] : [],
+      };
+      if (options.room.grid) entity.room.grid = { ...options.room.grid };
+    }
+    if (options.ai) entity.ai = { ...options.ai };
+    // Ensure room facet exists for room-tagged entities
+    if (!entity.room && entity.tags.includes("room")) {
+      entity.room = { darkWhenUnlit: false, visits: 0, scenery: [] };
+    }
+
     this.entities.set(id, entity);
-
-    const location = (entity.properties["location"] as string) || VOID_LOCATION;
-    this.addToLocationIndex(location, id);
-
+    this.addToLocationIndex(entity.location, id);
     return entity;
   }
 
   get(id: string): Entity {
     const entity = this.entities.get(id);
-    if (!entity) {
-      throw new EntityNotFoundError(id);
-    }
+    if (!entity) throw new EntityNotFoundError(id);
     return entity;
   }
-
   tryGet(id: string): Entity | null {
     return this.entities.get(id) || null;
   }
-
   has(id: string): boolean {
     return this.entities.has(id);
   }
 
-  /** Remove an entity from the store. Also removes any entities contained within it. */
   delete(id: string): void {
     const entity = this.tryGet(id);
     if (!entity) return;
-    // Recursively delete contents
-    const contents = this.getContents(id);
-    for (const child of contents) {
+    for (const child of this.getContents(id)) {
       this.delete(child.id);
     }
-    // Remove from location index
-    const location = (entity.properties["location"] as string) || VOID_LOCATION;
-    this.removeFromLocationIndex(location, id);
+    this.removeFromLocationIndex(entity.location, id);
     this.entities.delete(id);
+  }
+
+  setLocation(id: string, newLocation: string): void {
+    const entity = this.get(id);
+    const oldLocation = entity.location;
+    entity.location = newLocation;
+    this.removeFromLocationIndex(oldLocation, id);
+    this.addToLocationIndex(newLocation, id);
   }
 
   setProperty(id: string, assignment: { name: string; value: unknown }): void {
     const entity = this.get(id);
     const { name, value } = assignment;
-
-    // Null/undefined means delete the property
+    // Route typed fields to their proper locations
+    switch (name) {
+      case "location":
+        if (value === null || value === undefined) return;
+        this.setLocation(id, value as string);
+        return;
+      case "name":
+        entity.name = (value as string) || entity.id;
+        return;
+      case "description":
+        entity.description = (value as string) || "";
+        return;
+      case "visits":
+        if (entity.room) entity.room.visits = (value as number) || 0;
+        return;
+    }
     if (value === null || value === undefined) {
       delete entity.properties[name];
       return;
     }
-
-    // Property must be defined in the registry
     const def = this.registry.definitions[name];
-    if (!def) {
-      throw new UndefinedPropertyError(name);
-    }
+    if (!def) throw new UndefinedPropertyError(name);
     const errors = validateValue(this.registry, { name, value });
-    if (errors.length > 0) {
-      throw new PropertyValueError(name, errors);
-    }
-    // Check entity-ref integrity
+    if (errors.length > 0) throw new PropertyValueError(name, errors);
     this.validateEntityRef(def, value);
-
-    const oldValue = entity.properties[name];
     entity.properties[name] = value;
-
-    if (name === "location") {
-      const oldLocation = (oldValue as string) || VOID_LOCATION;
-      const newLocation = (value as string) || VOID_LOCATION;
-      this.removeFromLocationIndex(oldLocation, id);
-      this.addToLocationIndex(newLocation, id);
-    }
   }
 
   removeProperty(id: string, name: string): void {
-    const entity = this.get(id);
-    const oldValue = entity.properties[name];
-    delete entity.properties[name];
-
-    if (name === "location") {
-      const oldLocation = (oldValue as string) || VOID_LOCATION;
-      this.removeFromLocationIndex(oldLocation, id);
-      this.addToLocationIndex(VOID_LOCATION, id);
-    }
+    delete this.get(id).properties[name];
   }
-
   getProperty<T>(id: string, name: string): T | undefined {
     return this.get(id).properties[name] as T | undefined;
   }
 
   addTag(id: string, tag: string): void {
-    this.get(id).tags.add(tag);
+    const tags = this.get(id).tags;
+    if (!tags.includes(tag)) tags.push(tag);
   }
 
   removeTag(id: string, tag: string): void {
-    this.get(id).tags.delete(tag);
+    const entity = this.get(id);
+    const idx = entity.tags.indexOf(tag);
+    if (idx !== -1) entity.tags.splice(idx, 1);
   }
 
   hasTag(id: string, tag: string): boolean {
-    return this.get(id).tags.has(tag);
+    return this.get(id).tags.includes(tag);
   }
 
-  /** Get direct children at a location */
   getContents(locationId: string): Entity[] {
     const ids = this.locationIndex.get(locationId);
     if (!ids) return [];
@@ -224,7 +210,6 @@ export class EntityStore {
     return result;
   }
 
-  /** Get all entities transitively contained within a location */
   getContentsDeep(locationId: string): Entity[] {
     const result: Entity[] = [];
     const queue = [locationId];
@@ -233,8 +218,7 @@ export class EntityStore {
       const current = queue.shift()!;
       if (visited.has(current)) continue;
       visited.add(current);
-      const children = this.getContents(current);
-      for (const child of children) {
+      for (const child of this.getContents(current)) {
         result.push(child);
         queue.push(child.id);
       }
@@ -242,7 +226,6 @@ export class EntityStore {
     return result;
   }
 
-  /** Walk up the location chain to find the containing entity with a given tag */
   findContaining(entityId: string, tag: string): Entity | null {
     let currentId = entityId;
     const visited = new Set<string>();
@@ -251,15 +234,18 @@ export class EntityStore {
       visited.add(currentId);
       const entity = this.tryGet(currentId);
       if (!entity) return null;
-      if (entity.tags.has(tag) && entity.id !== entityId) return entity;
-      const location = entity.properties["location"] as string | undefined;
-      if (!location || location === VOID_LOCATION || location === WORLD_LOCATION) return null;
-      currentId = location;
+      if (entity.tags.includes(tag) && entity.id !== entityId) return entity;
+      if (
+        !entity.location ||
+        entity.location === VOID_LOCATION ||
+        entity.location === WORLD_LOCATION
+      )
+        return null;
+      currentId = entity.location;
     }
     return null;
   }
 
-  /** Walk up the location chain to get the full path from entity to root */
   getLocationChain(entityId: string): Entity[] {
     const chain: Entity[] = [];
     let currentId = entityId;
@@ -270,60 +256,48 @@ export class EntityStore {
       const entity = this.tryGet(currentId);
       if (!entity) break;
       chain.push(entity);
-      const location = entity.properties["location"] as string | undefined;
-      if (!location || location === VOID_LOCATION || location === WORLD_LOCATION) break;
-      currentId = location;
+      if (
+        !entity.location ||
+        entity.location === VOID_LOCATION ||
+        entity.location === WORLD_LOCATION
+      )
+        break;
+      currentId = entity.location;
     }
     return chain;
   }
 
-  /** Find all entities with a given tag */
   findByTag(tag: string): Entity[] {
     const result: Entity[] = [];
     for (const entity of this.entities.values()) {
-      if (entity.tags.has(tag)) {
-        result.push(entity);
-      }
+      if (entity.tags.includes(tag)) result.push(entity);
     }
     return result;
   }
 
-  /** Find entities at a location with a specific tag */
   findByTagAt(tag: string, locationId: string): Entity[] {
-    return this.getContents(locationId).filter((e) => e.tags.has(tag));
+    return this.getContents(locationId).filter((e) => e.tags.includes(tag));
   }
 
-  /** Get exits from a room (exit entities whose location is this room) */
   getExits(roomId: string): Entity[] {
     return this.findByTagAt("exit", roomId);
   }
 
-  /** Serialize the full store state for undo/save */
   saveState(): EntitySnapshot[] {
     const snapshots: EntitySnapshot[] = [];
     for (const entity of this.entities.values()) {
-      snapshots.push({
-        id: entity.id,
-        tags: Array.from(entity.tags),
-        properties: { ...entity.properties },
-      });
+      snapshots.push(snapshotEntity(entity));
     }
     return snapshots;
   }
 
-  /** Restore from a saved state, replacing all entities */
   restoreState(snapshots: EntitySnapshot[]): void {
     this.entities.clear();
     this.locationIndex.clear();
     for (const snap of snapshots) {
-      const entity: Entity = {
-        id: snap.id,
-        tags: new Set(snap.tags),
-        properties: { ...snap.properties },
-      };
+      const entity = entityFromSnapshot(snap);
       this.entities.set(entity.id, entity);
-      const location = (entity.properties["location"] as string) || VOID_LOCATION;
-      this.addToLocationIndex(location, entity.id);
+      this.addToLocationIndex(entity.location, entity.id);
     }
   }
 
@@ -336,26 +310,18 @@ export class EntityStore {
     set.add(entityId);
   }
 
-  /**
-   * Validate entity-ref format: the referenced entity must exist,
-   * or be a known special location (void, world).
-   */
   private validateEntityRef(def: PropertyDefinition, value: unknown): void {
     if (def.schema.format !== "entity-ref") return;
     if (typeof value !== "string") return;
     if (value === VOID_LOCATION || value === WORLD_LOCATION) return;
-    if (!this.entities.has(value)) {
-      throw new DanglingReferenceError(def.name, value);
-    }
+    if (!this.entities.has(value)) throw new DanglingReferenceError(def.name, value);
   }
 
   private removeFromLocationIndex(locationId: string, entityId: string): void {
     const set = this.locationIndex.get(locationId);
     if (set) {
       set.delete(entityId);
-      if (set.size === 0) {
-        this.locationIndex.delete(locationId);
-      }
+      if (set.size === 0) this.locationIndex.delete(locationId);
     }
   }
 }

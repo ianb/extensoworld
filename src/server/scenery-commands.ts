@@ -131,8 +131,19 @@ export async function handleSceneryCheck(
     createdAt: new Date().toISOString(),
     gameId,
     id: storeOnEntity.id,
-    tags: Array.from(storeOnEntity.tags),
-    properties: { ...storeOnEntity.properties },
+    tags: [...storeOnEntity.tags],
+    name: storeOnEntity.name,
+    description: storeOnEntity.description,
+    location: storeOnEntity.location,
+    aliases: storeOnEntity.aliases.length > 0 ? [...storeOnEntity.aliases] : undefined,
+    secret: storeOnEntity.secret,
+    exit: storeOnEntity.exit,
+    room: storeOnEntity.room,
+    ai: storeOnEntity.ai,
+    properties:
+      Object.keys(storeOnEntity.properties).length > 0
+        ? { ...storeOnEntity.properties }
+        : undefined,
     authoring,
   });
 

@@ -41,9 +41,9 @@ export interface AiCreateRoomResult {
 }
 
 function describeExitForLlm(entity: Entity): string {
-  const dir = (entity.properties["direction"] as string) || "?";
-  const dest = (entity.properties["destination"] as string) || "(unresolved)";
-  const name = (entity.properties["name"] as string) || entity.id;
+  const dir = (entity.exit && entity.exit.direction) || "?";
+  const dest = (entity.exit && entity.exit.destination) || "(unresolved)";
+  const name = entity.name;
   return `- ${dir}: ${name} \u2192 ${dest}`;
 }
 
@@ -52,16 +52,16 @@ function buildPrompt(
   { exit, sourceRoom, playerId }: { exit: Entity; sourceRoom: Entity; playerId: string },
 ): string {
   const parts: string[] = [];
-  const intent = (exit.properties["destinationIntent"] as string) || "unknown destination";
-  const direction = (exit.properties["direction"] as string) || "unknown";
-  const exitName = (exit.properties["name"] as string) || exit.id;
+  const intent = (exit.exit && exit.exit.destinationIntent) || "unknown destination";
+  const direction = (exit.exit && exit.exit.direction) || "unknown";
+  const exitName = exit.name;
   parts.push(
-    `<exit-context>\nThe player is going ${direction} through "${exitName}".\nDestination intent: ${intent}\nReturn direction: ${reverseDirection(direction)}\nSource room: ${sourceRoom.properties["name"] || sourceRoom.id}\n</exit-context>`,
+    `<exit-context>\nThe player is going ${direction} through "${exitName}".\nDestination intent: ${intent}\nReturn direction: ${reverseDirection(direction)}\nSource room: ${sourceRoom.name}\n</exit-context>`,
   );
   parts.push(
-    `<source-room>\n- ${sourceRoom.properties["name"] || sourceRoom.id}: ${sourceRoom.properties["description"] || "No description."}\n</source-room>`,
+    `<source-room>\n- ${sourceRoom.name}: ${sourceRoom.description || "No description."}\n</source-room>`,
   );
-  const sourceExits = store.getContents(sourceRoom.id).filter((e) => e.tags.has("exit"));
+  const sourceExits = store.getContents(sourceRoom.id).filter((e) => e.tags.includes("exit"));
   if (sourceExits.length > 0) {
     parts.push(
       `<source-room-exits>\n${sourceExits.map(describeExitForLlm).join("\n")}\n</source-room-exits>`,
@@ -128,7 +128,7 @@ export async function handleAiCreateRoom(
 ): Promise<AiCreateRoomResult> {
   const systemPrompt = buildSystemPrompt({ prompts, room: sourceRoom, store });
   const prompt = buildPrompt(store, { exit, sourceRoom, playerId });
-  const direction = (exit.properties["direction"] as string) || "unknown";
+  const direction = (exit.exit && exit.exit.direction) || "unknown";
   console.log("[ai-create-room] Materializing room via:", direction);
   const startTime = Date.now();
   const objectSchema = buildRoomSchema(store);
@@ -265,7 +265,7 @@ async function createReturnAndAdditionalExits(
   },
 ): Promise<void> {
   const returnDir = reverseDirection(direction);
-  const srcName = (sourceRoom.properties["name"] as string) || sourceRoom.id;
+  const srcName = sourceRoom.name;
   await createAndSave(store, {
     id: `exit:${roomSlug}:${returnDir}`,
     tags: ["exit"],

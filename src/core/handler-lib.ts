@@ -82,16 +82,16 @@ export class HandlerLib {
   }
 
   findKey(obj: Entity): Entity | null {
-    const keyId = obj.properties["unlockedBy"] as string | undefined;
+    const keyId = obj.properties.unlockedBy;
     if (!keyId) return null;
     const key = this.store.tryGet(keyId);
     if (!key) return null;
-    if (key.properties["location"] !== this.player.id) return null;
+    if (key.location !== this.player.id) return null;
     return key;
   }
 
   checkCarryCapacity(): string | null {
-    const capacity = (this.player.properties["carryingCapacity"] as number) || 0;
+    const capacity = this.player.properties.carryingCapacity || 0;
     if (capacity <= 0) return null;
     if (this.carried().length >= capacity) return "{!You're carrying too many things already.!}";
     return null;
@@ -108,13 +108,11 @@ export class HandlerLib {
   }
 
   examine(target: Entity): PerformResult {
-    const rawDesc =
-      (target.properties["description"] as string) ||
-      `You see nothing special about the ${this.ref(target)}.`;
+    const rawDesc = target.description || `You see nothing special about the ${this.ref(target)}.`;
     const desc = renderTemplate(rawDesc, { entity: target, store: this.store });
     const parts = [desc];
-    if (target.tags.has("container") && target.properties["open"] === true) {
-      const items = this.store.getContents(target.id).filter((e) => !e.tags.has("exit"));
+    if (target.tags.includes("container") && target.properties.open) {
+      const items = this.store.getContents(target.id).filter((e) => !e.tags.includes("exit"));
       if (items.length > 0) {
         parts.push(`It contains: ${items.map((e) => this.ref(e)).join(", ")}.`);
       } else {
@@ -126,11 +124,14 @@ export class HandlerLib {
 
   take(obj: Entity): PerformResult {
     const ref = this.ref(obj);
-    const from = (obj.properties["location"] as string) || "void";
     return {
       output: `You take the ${ref}.`,
       events: [
-        this.moveEvent(obj.id, { to: this.player.id, from, description: `Picked up ${ref}` }),
+        this.moveEvent(obj.id, {
+          to: this.player.id,
+          from: obj.location,
+          description: `Picked up ${ref}`,
+        }),
       ],
     };
   }
@@ -138,7 +139,7 @@ export class HandlerLib {
   drop(obj: Entity): PerformResult {
     const ref = this.ref(obj);
     const events: WorldEvent[] = [];
-    if (obj.properties["worn"]) {
+    if (obj.properties.worn) {
       events.push(
         this.setEvent(obj.id, { property: "worn", value: false, description: `Removed ${ref}` }),
       );
@@ -166,8 +167,8 @@ export class HandlerLib {
       this.setEvent(obj.id, { property: "open", value: true, description: `Opened ${ref}` }),
     ];
     const parts = [`You open the ${ref}.`];
-    if (obj.tags.has("container")) {
-      const items = this.store.getContents(obj.id).filter((e) => !e.tags.has("exit"));
+    if (obj.tags.includes("container")) {
+      const items = this.store.getContents(obj.id).filter((e) => !e.tags.includes("exit"));
       if (items.length > 0) {
         parts.push(`Inside you see: ${items.map((e) => this.ref(e)).join(", ")}.`);
       }
@@ -212,7 +213,7 @@ export class HandlerLib {
     const events: WorldEvent[] = [
       this.setEvent(obj.id, { property: "locked", value: false, description: `Unlocked ${ref}` }),
     ];
-    const pairedId = obj.properties["pairedDoor"] as string | undefined;
+    const pairedId = obj.properties.pairedDoor;
     if (pairedId) {
       events.push(
         this.setEvent(pairedId, {
@@ -283,13 +284,16 @@ export class HandlerLib {
 
   wear(obj: Entity): PerformResult {
     const ref = this.ref(obj);
-    const from = (obj.properties["location"] as string) || "void";
     const events: WorldEvent[] = [
       this.setEvent(obj.id, { property: "worn", value: true, description: `Now wearing ${ref}` }),
     ];
-    if (from !== this.player.id) {
+    if (obj.location !== this.player.id) {
       events.unshift(
-        this.moveEvent(obj.id, { to: this.player.id, from, description: `Picked up ${ref}` }),
+        this.moveEvent(obj.id, {
+          to: this.player.id,
+          from: obj.location,
+          description: `Picked up ${ref}`,
+        }),
       );
     }
     return { output: `You put on the ${ref}.`, events };
@@ -310,8 +314,8 @@ export class HandlerLib {
   }
 
   showScore(): PerformResult {
-    const s = (this.player.properties["score"] as number) || 0;
-    const max = (this.player.properties["maxScore"] as number) || 0;
+    const s = this.player.properties.score || 0;
+    const max = this.player.properties.maxScore || 0;
     return {
       output: max > 0 ? `Your score is ${s} out of ${max}.` : `Your score is ${s}.`,
       events: [],
@@ -319,7 +323,7 @@ export class HandlerLib {
   }
 
   incrementVisits(): PerformResult {
-    const visits = (this.room.properties["visits"] as number) || 0;
+    const visits = (this.room.room && this.room.room.visits) || 0;
     const ev = this.setEvent(this.room.id, {
       property: "visits",
       value: visits + 1,

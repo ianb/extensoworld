@@ -104,7 +104,7 @@ export function startConversation(
   }
 
   // No explicit greeting — just show available topics
-  const npcName = (npc.properties["name"] as string) || npc.id;
+  const npcName = npc.name;
   const allTopics = collectAllTopics(data);
   for (const t of allTopics) {
     state.knownWords.add(t);
@@ -132,7 +132,7 @@ export function processWord(
     const seen = Array.from(state.seenWords);
     const known = Array.from(state.knownWords);
     const all = Array.from(new Set([...seen, ...known])).toSorted();
-    const npcName = (npc.properties["name"] as string) || npc.id;
+    const npcName = npc.name;
     const output =
       all.length > 0
         ? `Topics for ${npcName}: ${all.join(", ")}`

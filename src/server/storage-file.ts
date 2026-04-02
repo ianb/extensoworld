@@ -53,11 +53,7 @@ export class FileStorage implements RuntimeStorage {
   }
 
   async saveAiEntity(record: AiEntityRecord): Promise<void> {
-    const props: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(record.properties)) {
-      props[key] = value === undefined ? null : value;
-    }
-    appendJsonl(this.path(`ai-entities-${record.gameId}.jsonl`), { ...record, properties: props });
+    appendJsonl(this.path(`ai-entities-${record.gameId}.jsonl`), record);
   }
 
   async getAiEntityIds(gameId: string): Promise<Set<string>> {

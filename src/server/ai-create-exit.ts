@@ -6,7 +6,7 @@ import { getLlm, getLlmProviderOptions, getLlmAbortSignal } from "./llm.js";
 import { describeProperties, collectTags, buildPropertiesSchema } from "./ai-prompt-helpers.js";
 import { composeCreatePrompt } from "./ai-prompts.js";
 import { getStorage } from "./storage-instance.js";
-import type { AuthoringInfo } from "./storage.js";
+import type { AuthoringInfo, AiEntityRecord } from "./storage.js";
 import { recordAiCall } from "./ai-quota.js";
 
 export interface AiCreateExitResult {
@@ -64,14 +64,14 @@ function buildExitSchema(store: EntityStore) {
 }
 
 function describeEntityForLlm(entity: Entity): string {
-  const tags = Array.from(entity.tags).join(", ");
-  return `- ${entity.properties["name"] || entity.id} [${tags}]`;
+  const tags = entity.tags.join(", ");
+  return `- ${entity.name} [${tags}]`;
 }
 
 function describeExitForLlm(entity: Entity): string {
-  const dir = (entity.properties["direction"] as string) || "?";
-  const dest = (entity.properties["destination"] as string) || "(unresolved)";
-  const name = (entity.properties["name"] as string) || entity.id;
+  const dir = (entity.exit && entity.exit.direction) || "?";
+  const dest = (entity.exit && entity.exit.destination) || "(unresolved)";
+  const name = entity.name;
   return `- ${dir}: ${name} \u2192 ${dest}`;
 }
 
@@ -84,16 +84,16 @@ function buildPrompt(
   parts.push(`<user-request>\nai create exit ${instructions}\n</user-request>`);
 
   parts.push(
-    `<current-room>\n- ${room.properties["name"] || room.id}: ${room.properties["description"] || "No description."}\n</current-room>`,
+    `<current-room>\n- ${room.name}: ${room.description || "No description."}\n</current-room>`,
   );
 
   const contents = store.getContents(room.id);
-  const exits = contents.filter((e) => e.tags.has("exit"));
+  const exits = contents.filter((e) => e.tags.includes("exit"));
   if (exits.length > 0) {
     parts.push(`<existing-exits>\n${exits.map(describeExitForLlm).join("\n")}\n</existing-exits>`);
   }
 
-  const items = contents.filter((e) => !e.tags.has("exit") && !e.tags.has("player"));
+  const items = contents.filter((e) => !e.tags.includes("exit") && !e.tags.includes("player"));
   if (items.length > 0) {
     parts.push(`<room-contents>\n${items.map(describeEntityForLlm).join("\n")}\n</room-contents>`);
   }
@@ -186,30 +186,30 @@ export async function handleAiCreateExit(
     entityId = `${baseId}-${n}`;
   }
 
-  const properties: Record<string, unknown> = {
-    location: room.id,
-    direction: response.direction,
-    name: response.name,
-    description: response.description,
-    destinationIntent: response.destinationIntent,
-  };
+  const extraProps: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(response.properties)) {
-    if (value !== undefined) properties[key] = value;
-  }
-  if (response.aliases.length > 0) {
-    properties.aliases = response.aliases;
+    if (value !== undefined) extraProps[key] = value;
   }
 
-  store.create(entityId, { tags: ["exit"], properties });
-
-  await getStorage().saveAiEntity({
+  const entityRecord: AiEntityRecord = {
     createdAt: new Date().toISOString(),
     gameId,
     id: entityId,
     tags: ["exit"],
-    properties,
+    name: response.name,
+    description: response.description,
+    location: room.id,
+    aliases: response.aliases.length > 0 ? response.aliases : undefined,
+    exit: {
+      direction: response.direction,
+      destinationIntent: response.destinationIntent,
+    },
+    properties: Object.keys(extraProps).length > 0 ? extraProps : undefined,
     authoring,
-  });
+  };
+
+  store.create(entityId, entityRecord);
+  await getStorage().saveAiEntity(entityRecord);
 
   const debugInfo: AiCreateExitDebugInfo | undefined = debug
     ? { systemPrompt, prompt, response, schema: z.toJSONSchema(objectSchema), durationMs }

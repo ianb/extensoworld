@@ -59,7 +59,7 @@ export const DEFAULT_HANDLERS: HandlerData[] = [
     priority: 10,
     indirectRequirements: { tags: ["container"] },
     check: "return object.properties.location === indirect.id;",
-    veto: "if (indirect.tags.has('openable') && !indirect.properties.open) return 'The ' + lib.ref(indirect) + ' is closed.'; return null;",
+    veto: "if (indirect.tags.includes('openable') && !indirect.properties.open) return 'The ' + lib.ref(indirect) + ' is closed.'; return null;",
     perform: "return lib.takeFrom(object, indirect);",
   },
 
@@ -103,7 +103,7 @@ export const DEFAULT_HANDLERS: HandlerData[] = [
     },
     indirectRequirements: { tags: ["container"] },
     check: "return object.properties.location === player.id;",
-    veto: "if (indirect.tags.has('openable') && !indirect.properties.open) return 'The ' + lib.ref(indirect) + ' is closed.'; return null;",
+    veto: "if (indirect.tags.includes('openable') && !indirect.properties.open) return 'The ' + lib.ref(indirect) + ' is closed.'; return null;",
     perform: "return lib.putIn(object, indirect);",
   },
 

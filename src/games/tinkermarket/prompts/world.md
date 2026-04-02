@@ -16,6 +16,7 @@ The aside should feel like an observation, not a joke. It should make the reader
 ## Inspirations
 
 ### Worldbuilding
+
 <pick num="3">
 - **China Mieville's New Crobuzon** (Bas-Lag) — strange species and stranger goods, treated as the ordinary texture of city life. Specificity of materials and biology. The weird is mundane.
 - **Valerian and the City of a Thousand Planets** — the Big Market sequence. A vast trading hub where thousands of species do business side by side, each with their own goods and customs. Density of incidental detail — background transactions, strange delivery methods, species trying to negotiate across incompatible customs.
@@ -24,6 +25,7 @@ The aside should feel like an observation, not a joke. It should make the reader
 </pick>
 
 ### Crafting feel
+
 <pick num="3">
 - **Minecraft** — discovery through experimentation. Put things together and find out what happens. The joy of the crafting loop before you look anything up.
 - **Breath of the Wild** — throw ingredients together and see what results. The system rewards curiosity and surprises you.

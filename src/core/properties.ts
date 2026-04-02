@@ -71,7 +71,25 @@ export function validateValue(
   return (validate.errors || []).map((e) => `${entry.name}${e.instancePath}: ${e.message}`);
 }
 
-export type PropertyBag = Record<string, unknown>;
+/** Typed base properties shared across all games, plus arbitrary game-specific keys */
+export interface PropertyBag {
+  shortDescription?: string;
+  open?: boolean;
+  locked?: boolean;
+  unlockedBy?: string;
+  carryingCapacity?: number;
+  score?: number;
+  maxScore?: number;
+  lit?: boolean;
+  switchedOn?: boolean;
+  fixed?: boolean;
+  takeRefusal?: string;
+  worn?: boolean;
+  depositPoints?: number;
+  pairedDoor?: string;
+  powerRemaining?: number;
+  [key: string]: unknown;
+}
 
 export function getProperty<T>(
   bag: PropertyBag,

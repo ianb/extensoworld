@@ -17,6 +17,7 @@ import type {
   UserRow,
 } from "./d1-types.js";
 import { userRowToRecord, rowToAuthoring, authoringBindValues } from "./d1-types.js";
+import { deserializeEntityRow, serializeEntityRecord } from "./entity-serialize.js";
 
 export type { D1Database } from "./d1-types.js";
 
@@ -34,21 +35,11 @@ export class D1Storage implements RuntimeStorage {
       .prepare("SELECT * FROM ai_entities WHERE game_id = ? ORDER BY created_at")
       .bind(gameId)
       .all<EntityRow>();
-    return result.results.map((row) => ({
-      id: row.id,
-      tags: JSON.parse(row.tags) as string[],
-      properties: JSON.parse(row.properties) as Record<string, unknown>,
-      createdAt: row.created_at,
-      gameId: row.game_id,
-      authoring: rowToAuthoring(row),
-    }));
+    return result.results.map((row) => deserializeEntityRow(row));
   }
 
   async saveAiEntity(record: AiEntityRecord): Promise<void> {
-    const props: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(record.properties)) {
-      props[key] = value === undefined ? null : value;
-    }
+    const stored = serializeEntityRecord(record);
     await this.db
       .prepare(
         `INSERT OR REPLACE INTO ai_entities
@@ -59,7 +50,7 @@ export class D1Storage implements RuntimeStorage {
         record.gameId,
         record.id,
         JSON.stringify(record.tags),
-        JSON.stringify(props),
+        stored,
         record.createdAt,
         ...authoringBindValues(record.authoring),
       )

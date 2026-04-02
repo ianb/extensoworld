@@ -39,7 +39,7 @@ export function createGameRunner({
     const players = store.findByTag("player");
     const player = players[0];
     if (!player) throw new PlayerNotFoundError();
-    return { id: player.id, location: player.properties["location"] as string };
+    return { id: player.id, location: player.location };
   }
 
   function look(): string {

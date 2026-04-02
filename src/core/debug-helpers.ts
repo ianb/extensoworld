@@ -3,7 +3,7 @@ import type { ResolvedCommand } from "./verb-types.js";
 import type { parseCommand } from "./verbs.js";
 
 export function entityLabel(entity: Entity): string {
-  const name = (entity.properties["name"] as string) || entity.id;
+  const name = entity.name;
   return `${name} [${entity.id}]`;
 }
 

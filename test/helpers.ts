@@ -42,7 +42,7 @@ export class TestGame {
   /** Get the current room name */
   get roomName(): string {
     const room = this.runner.store.get(this.room);
-    return (room.properties["name"] as string) || this.room;
+    return room.name;
   }
 
   /** Get inventory as a list of item names */
@@ -50,12 +50,12 @@ export class TestGame {
     const player = this.runner.store.findByTag("player")[0];
     if (!player) return [];
     const contents = this.runner.store.getContents(player.id);
-    return contents.map((e) => (e.properties["name"] as string) || e.id);
+    return contents.map((e) => e.name);
   }
 
   /** Check where an entity is */
   locationOf(entityId: string): string {
-    return this.runner.getProperty(entityId, "location") as string;
+    return this.runner.store.get(entityId).location;
   }
 
   /** Get a property of an entity */

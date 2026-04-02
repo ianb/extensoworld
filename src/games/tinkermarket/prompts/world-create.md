@@ -5,6 +5,7 @@ Created objects must fit in a trans-dimensional marketplace focused on materials
 Every created entity should have a `secret` property. Secrets describe hidden interactive potential — what happens when the player experiments, what this object can do that isn't obvious, how it connects to other things. Secrets drive the verb fallback system: when a player tries something unexpected, the secret tells the AI how to respond.
 
 Good secrets for this world:
+
 - Materials that react to other specific materials (heat, light, vibration, proximity)
 - Tools that have an unintended secondary use
 - Vendors who know something they're not advertising
@@ -20,6 +21,7 @@ Materials should have specific, tangible properties that suggest what they can d
 Think about what each material's properties imply for crafting. If it conducts, what could you build with it? If it resists shaping, what would happen if you forced it? If it changes temperature, what does that enable?
 
 ## Examples of good entities
+
 <pick num="2">
 - **A spool of threadlight**: Thin fiber that glows faintly, sold by a vendor who winds it by hand from raw light. Secret: it dims near void glass and brightens near shimmerite — it could be used as a proximity sensor for certain materials.
 - **A jar of stasis gel**: Thick, clear gel that slows whatever you put in it. The vendor demonstrates by dropping a marble in — it sinks over the course of an hour. Secret: if you coat coppervine wire in it, the wire stops trying to return to its remembered shape and holds any form permanently.

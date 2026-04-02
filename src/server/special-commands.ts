@@ -27,7 +27,7 @@ function describeCurrentRoom(s: EntityStore): string {
   const players = s.findByTag("player");
   const player = players[0];
   if (!player) return "No player found.";
-  const roomId = player.properties["location"] as string;
+  const roomId = player.location;
   const room = s.get(roomId);
   if (!isRoomLit(s, { room, playerId: player.id })) {
     return darknessDescription();

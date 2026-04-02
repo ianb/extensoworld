@@ -70,7 +70,7 @@ Use lib.carried() to check what the player is carrying, then filter by tag. The 
 Light a candle (requires a flame source in inventory):
 \`\`\`
 var carried = lib.carried();
-var flameSrc = carried.filter(function(e) { return e.tags.has("flame-source"); });
+var flameSrc = carried.filter(function(e) { return e.tags.includes("flame-source"); });
 if (flameSrc.length === 0) {
   return lib.result("You have nothing to light it with.");
 }
@@ -104,7 +104,7 @@ Use one object on another (ditransitive — object + indirect):
 if (!indirect) {
   return lib.result("Use it on what?");
 }
-if (!indirect.tags.has("device") || indirect.properties.powered) {
+if (!indirect.tags.includes("device") || indirect.properties.powered) {
   return lib.result("That doesn't seem to help.");
 }
 return {
@@ -149,7 +149,7 @@ Entity creation: lib.createEvent(entityId, { tags, properties, description }). U
 const HIDDEN_PROPERTIES = new Set(["description", "shortDescription", "secret", "aiPrompt"]);
 
 function describeEntityForLlm(entity: Entity): string {
-  const tags = Array.from(entity.tags).join(", ");
+  const tags = entity.tags.join(", ");
   const props: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(entity.properties)) {
     if (HIDDEN_PROPERTIES.has(key)) continue;
@@ -170,7 +170,7 @@ export function describeCommand(command: ResolvedCommand): string {
 }
 
 function entityName(entity: Entity): string {
-  return (entity.properties["name"] as string) || entity.id;
+  return entity.name;
 }
 
 export function buildFallbackPrompt(
@@ -208,18 +208,18 @@ export function buildFallbackPrompt(
 
   if (involved.length > 0) {
     const descs = involved.map((e) => {
-      const desc = (e.properties["description"] as string) || "No description.";
+      const desc = e.description || "No description.";
       return `${describeEntityForLlm(e)}\n  description: "${desc}"`;
     });
     parts.push(`<target-objects>\n${descs.join("\n\n")}\n</target-objects>`);
   }
 
   const secrets: string[] = [];
-  const roomSecret = room.properties["secret"] as string | undefined;
+  const roomSecret = room.secret;
   if (roomSecret) secrets.push(`Room: ${roomSecret}`);
   for (const e of involved) {
-    const s = e.properties["secret"] as string | undefined;
-    if (s) secrets.push(`${e.properties["name"] || e.id}: ${s}`);
+    const s = e.secret;
+    if (s) secrets.push(`${e.name}: ${s}`);
   }
   if (secrets.length > 0) {
     parts.push(

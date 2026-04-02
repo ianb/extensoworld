@@ -1,1 +1,1 @@
-{"id": "player:1", "tags": ["player"], "properties": {"location": "room:hibernation-bay-c7", "name": "Awakened Sleeper", "carryingCapacity": 10, "score": 0, "maxScore": 0}}
+{"id":"player:1","tags":["player"],"name":"Awakened Sleeper","description":"","location":"room:hibernation-bay-c7","properties":{"carryingCapacity":10,"score":0,"maxScore":0}}

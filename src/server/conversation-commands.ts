@@ -35,7 +35,7 @@ export async function handleTalkTo(
   { npcId, session, authoring }: { npcId: string; session: SessionKey; authoring: AuthoringInfo },
 ): Promise<ConversationResponse> {
   const npc = game.store.get(npcId);
-  const npcName = (npc.properties["name"] as string) || npc.id;
+  const npcName = npc.name;
 
   const initial = (game.conversations && game.conversations[npcId]) || null;
   const data = await loadConversationData(session.gameId, { npcId, initial });
@@ -45,7 +45,7 @@ export async function handleTalkTo(
     const players = game.store.findByTag("player");
     const player = players[0];
     if (player) {
-      const roomId = player.properties["location"] as string;
+      const roomId = player.location;
       const room = game.store.get(roomId);
       const tempState: ConversationState = {
         npcId,
@@ -140,7 +140,7 @@ export async function handleConversationWord(
   }
 
   const npc = game.store.get(state.npcId);
-  const npcName = (npc.properties["name"] as string) || npc.id;
+  const npcName = npc.name;
   const initial = (game.conversations && game.conversations[state.npcId]) || null;
   const data = await loadConversationData(session.gameId, { npcId: state.npcId, initial });
 
@@ -238,7 +238,7 @@ async function handleUnknownWord(
       conversationMode: { npcName, knownWords },
     };
   }
-  const roomId = player.properties["location"] as string;
+  const roomId = player.location;
   const room = game.store.get(roomId);
 
   const aiResult = await handleAiConversationFallback(game.store, {

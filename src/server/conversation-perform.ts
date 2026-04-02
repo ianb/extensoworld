@@ -30,7 +30,7 @@ export function applyPerformCode(
   const player = players[0];
   if (!player) return result;
 
-  const roomId = player.properties["location"] as string;
+  const roomId = player.location;
   const room = game.store.get(roomId);
   const performResult = evaluateWordPerform(matchedEntry, {
     npc,
@@ -43,7 +43,7 @@ export function applyPerformCode(
   if (!performResult) return result;
 
   if (!performResult.allowed) {
-    const npcName = (npc.properties["name"] as string) || npc.id;
+    const npcName = npc.name;
     return {
       ...result,
       output: performResult.response || `{!${npcName} doesn't respond to that.!}`,

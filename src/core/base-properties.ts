@@ -1,28 +1,20 @@
 import type { PropertyRegistry } from "./properties.js";
 import { defineProperty } from "./properties.js";
 
+/**
+ * Base property definitions for the extensible property bag.
+ *
+ * Properties that have moved to typed Entity fields are NOT here:
+ * name, description, location, aliases, secret → Entity top-level
+ * direction, destination, destinationIntent → Entity.exit
+ * darkWhenUnlit (was dark), visits, scenery, gridX/Y/Z → Entity.room
+ * aiPrompt, aiConversationPrompt → Entity.ai
+ */
 const BASE_PROPS = [
-  { name: "name", description: "Display name", schema: { type: "string" } },
-  {
-    name: "description",
-    description: "Text description shown to the player",
-    schema: { type: "string" },
-  },
   {
     name: "shortDescription",
     description: "Template string used in listings (inventory, room items). Falls back to name.",
     schema: { type: "string" },
-  },
-  {
-    name: "location",
-    description: "ID of the containing entity",
-    schema: { type: "string", format: "entity-ref" },
-  },
-  { name: "direction", description: "Direction label for an exit", schema: { type: "string" } },
-  {
-    name: "destination",
-    description: "Target room ID for an exit",
-    schema: { type: "string", format: "entity-ref" },
   },
   {
     name: "open",
@@ -40,17 +32,6 @@ const BASE_PROPS = [
     name: "unlockedBy",
     description: "Entity ID of the key that unlocks this",
     schema: { type: "string", format: "entity-ref" },
-  },
-  {
-    name: "visits",
-    description: "Number of times the player has entered this room",
-    schema: { type: "number" },
-    defaultValue: 0,
-  },
-  {
-    name: "aliases",
-    description: "Alternative names for matching in commands",
-    schema: { type: "array", items: { type: "string" } },
   },
   {
     name: "carryingCapacity",
@@ -72,13 +53,7 @@ const BASE_PROPS = [
   },
   {
     name: "lit",
-    description: "Whether this room or item provides light",
-    schema: { type: "boolean" },
-    defaultValue: false,
-  },
-  {
-    name: "dark",
-    description: "Room is pitch black — player sees nothing without a light source",
+    description: "Whether this item provides light",
     schema: { type: "boolean" },
     defaultValue: false,
   },
@@ -119,65 +94,6 @@ const BASE_PROPS = [
   {
     name: "powerRemaining",
     description: "Remaining power/fuel for a device",
-    schema: { type: "number" },
-    defaultValue: 0,
-  },
-  {
-    name: "aiPrompt",
-    description: "AI guidance prompt for this entity's location (not shown to players)",
-    schema: { type: "string" },
-  },
-  {
-    name: "aiConversationPrompt",
-    description:
-      "AI guidance prompt for NPC conversation generation in this region (not shown to players)",
-    schema: { type: "string" },
-  },
-  {
-    name: "secret",
-    description:
-      "Hidden interactive potential not obvious from the description — guides AI verb resolution (not shown to players)",
-    schema: { type: "string" },
-  },
-  {
-    name: "scenery",
-    description:
-      "Interactive scenery entries — each must be an object with word, description, rejection, and optional aliases",
-    schema: {
-      type: "array",
-      items: {
-        type: "object",
-        required: ["word", "description", "rejection"],
-        properties: {
-          word: { type: "string" },
-          aliases: { type: "array", items: { type: "string" } },
-          description: { type: "string" },
-          rejection: { type: "string" },
-        },
-      },
-    },
-  },
-  {
-    name: "destinationIntent",
-    description:
-      "Description of what an unresolved exit should lead to (replaced by destination when materialized)",
-    schema: { type: "string" },
-  },
-  {
-    name: "gridX",
-    description: "Grid X coordinate for spatial positioning",
-    schema: { type: "number" },
-    defaultValue: 0,
-  },
-  {
-    name: "gridY",
-    description: "Grid Y coordinate for spatial positioning",
-    schema: { type: "number" },
-    defaultValue: 0,
-  },
-  {
-    name: "gridZ",
-    description: "Grid Z coordinate (vertical level)",
     schema: { type: "number" },
     defaultValue: 0,
   },

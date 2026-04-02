@@ -139,9 +139,10 @@ export interface GridCoords {
 export function computeRoomCoordinates(source: Entity, direction: string): GridCoords | null {
   const offset = DIRECTION_OFFSETS_3D[direction.toLowerCase()];
   if (!offset) return null;
-  const sx = (source.properties["gridX"] as number) || 0;
-  const sy = (source.properties["gridY"] as number) || 0;
-  const sz = (source.properties["gridZ"] as number) || 0;
+  const grid = source.room && source.room.grid;
+  const sx = (grid && grid.x) || 0;
+  const sy = (grid && grid.y) || 0;
+  const sz = (grid && grid.z) || 0;
   return { x: sx + offset[0], y: sy + offset[1], z: sz + offset[2] };
 }
 
@@ -172,10 +173,10 @@ function isInteresting(entity: Entity): boolean {
 }
 
 function describeEntityDetail(entity: Entity): string {
-  const name = (entity.properties["name"] as string) || entity.id;
-  const tags = Array.from(entity.tags).join(", ");
-  const desc = (entity.properties["description"] as string) || "";
-  const secret = (entity.properties["secret"] as string) || "";
+  const name = entity.name;
+  const tags = entity.tags.join(", ");
+  const desc = entity.description;
+  const secret = entity.secret || "";
   const lines = [`- ${name} [${tags}]`];
   if (desc) lines.push(`  ${desc}`);
   // Include notable properties (skip hidden/boring ones)
@@ -215,15 +216,15 @@ export function buildNearbyContext(
   const roomContents = store.getContents(room.id).filter(isInteresting);
   if (roomContents.length > 0) {
     const sampled = sample(roomContents, 2);
-    const roomName = (room.properties["name"] as string) || room.id;
+    const roomName = room.name;
     sections.push(`Current room (${roomName}):\n${sampled.map(describeEntityDetail).join("\n\n")}`);
   }
 
   // Adjacent rooms via exits (sample 2 entities per room, max 3 rooms)
-  const exits = store.getContents(room.id).filter((e) => e.tags.has("exit"));
+  const exits = store.getContents(room.id).filter((e) => e.tags.includes("exit"));
   const adjacentRooms: Array<{ room: Entity; entities: Entity[] }> = [];
   for (const exit of exits) {
-    const destId = exit.properties["destination"] as string | undefined;
+    const destId = exit.exit && exit.exit.destination;
     if (!destId || !store.has(destId)) continue;
     const dest = store.get(destId);
     const contents = store.getContents(destId).filter(isInteresting);
@@ -234,7 +235,7 @@ export function buildNearbyContext(
   const sampledRooms = sample(adjacentRooms, 3);
   for (const adj of sampledRooms) {
     const sampled = sample(adj.entities, 2);
-    const adjName = (adj.room.properties["name"] as string) || adj.room.id;
+    const adjName = adj.room.name;
     sections.push(`Adjacent (${adjName}):\n${sampled.map(describeEntityDetail).join("\n\n")}`);
   }
 
@@ -262,9 +263,10 @@ ${sections.join("\n\n")}
  */
 function findRoomsAtCoords(store: EntityStore, coords: GridCoords): Entity[] {
   return store.findByTag("room").filter((r) => {
-    const rx = (r.properties["gridX"] as number) || 0;
-    const ry = (r.properties["gridY"] as number) || 0;
-    const rz = (r.properties["gridZ"] as number) || 0;
+    const g = r.room && r.room.grid;
+    const rx = (g && g.x) || 0;
+    const ry = (g && g.y) || 0;
+    const rz = (g && g.z) || 0;
     return rx === coords.x && ry === coords.y && rz === coords.z;
   });
 }
@@ -279,15 +281,15 @@ export function buildAdjacentRoomContext(store: EntityStore, center: GridCoords)
     const adjCoords = { x: center.x + offset[0], y: center.y + offset[1], z: center.z + offset[2] };
     const rooms = findRoomsAtCoords(store, adjCoords);
     for (const room of rooms) {
-      const name = (room.properties["name"] as string) || room.id;
-      const desc = (room.properties["description"] as string) || "";
+      const name = room.name;
+      const desc = room.description;
       const truncDesc = desc.length > 120 ? desc.slice(0, 117) + "..." : desc;
       // Check if this room has an unresolved exit pointing back toward center
-      const roomExits = store.getContents(room.id).filter((e) => e.tags.has("exit"));
+      const roomExits = store.getContents(room.id).filter((e) => e.tags.includes("exit"));
       const reverseDir = REVERSE_DIRECTIONS[dir];
       const hasBackExit = roomExits.some((e) => {
-        const eDir = (e.properties["direction"] as string) || "";
-        return eDir.toLowerCase() === reverseDir && e.properties["destinationIntent"];
+        const eDir = (e.exit && e.exit.direction) || "";
+        return eDir.toLowerCase() === reverseDir && e.exit && e.exit.destinationIntent;
       });
       const backNote = hasBackExit ? " (has unresolved exit pointing back this way)" : "";
       entries.push(`- ${dir}: ${name} (${room.id})${backNote}\n  ${truncDesc}`);

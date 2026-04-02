@@ -1,1 +1,1 @@
-{"id":"player:1","tags":["player"],"properties":{"location":"room:at-end-of-road","name":"Adventurer","carryingCapacity":7,"score":36,"maxScore":350}}
+{"id":"player:1","tags":["player"],"name":"Adventurer","description":"","location":"room:at-end-of-road","properties":{"carryingCapacity":7,"score":36,"maxScore":350}}

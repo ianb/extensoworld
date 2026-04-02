@@ -21,13 +21,7 @@ function ensureDataDir(): void {
 
 export function saveAiEntity(record: AiEntityRecord): void {
   ensureDataDir();
-  // Convert undefined values to null so they survive JSON serialization
-  const props: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(record.properties)) {
-    props[key] = value === undefined ? null : value;
-  }
-  const saved = { ...record, properties: props };
-  appendFileSync(entityFilePath(record.gameId), JSON.stringify(saved) + "\n");
+  appendFileSync(entityFilePath(record.gameId), JSON.stringify(record) + "\n");
 }
 
 /** Get the set of AI-created entity IDs for a game */
@@ -65,17 +59,35 @@ export function loadAiEntities(gameId: string, store: EntityStore): void {
   const records = content.split("\n").map((line) => JSON.parse(line) as AiEntityRecord);
   for (const record of records) {
     if (store.has(record.id)) {
-      // Entity already exists (e.g., a pre-existing exit) — apply property overrides
-      for (const [key, value] of Object.entries(record.properties)) {
-        if (value === null) {
-          store.removeProperty(record.id, key);
-        } else {
-          store.setProperty(record.id, { name: key, value });
+      // Entity already exists — apply property overrides from the record
+      const entity = store.get(record.id);
+      entity.name = record.name;
+      entity.description = record.description;
+      if (record.aliases) entity.aliases = record.aliases;
+      if (record.secret !== undefined) entity.secret = record.secret;
+      if (record.exit) entity.exit = record.exit;
+      if (record.room) entity.room = { ...entity.room, ...record.room } as typeof entity.room;
+      if (record.ai) entity.ai = record.ai;
+      if (record.properties) {
+        for (const [key, value] of Object.entries(record.properties)) {
+          if (value === null) {
+            store.removeProperty(record.id, key);
+          } else {
+            store.setProperty(record.id, { name: key, value });
+          }
         }
       }
     } else {
       store.create(record.id, {
         tags: record.tags,
+        name: record.name,
+        description: record.description,
+        location: record.location,
+        aliases: record.aliases,
+        secret: record.secret,
+        exit: record.exit,
+        room: record.room,
+        ai: record.ai,
         properties: record.properties,
       });
     }

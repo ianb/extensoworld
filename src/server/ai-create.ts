@@ -11,7 +11,7 @@ import {
 } from "./ai-prompt-helpers.js";
 import { composeCreatePrompt } from "./ai-prompts.js";
 import { getStorage } from "./storage-instance.js";
-import type { AuthoringInfo } from "./storage.js";
+import type { AuthoringInfo, AiEntityRecord } from "./storage.js";
 import { removeMatchingScenery } from "./ai-scenery.js";
 import { recordAiCall } from "./ai-quota.js";
 
@@ -78,8 +78,8 @@ function buildCreateSchema(store: EntityStore) {
 // --- Prompt building ---
 
 function describeEntityForLlm(entity: Entity): string {
-  const tags = Array.from(entity.tags).join(", ");
-  return `- ${entity.properties["name"] || entity.id} [${tags}]`;
+  const tags = entity.tags.join(", ");
+  return `- ${entity.name} [${tags}]`;
 }
 
 function buildPrompt(
@@ -91,12 +91,12 @@ function buildPrompt(
   parts.push(`<user-request>\nai create ${description}\n</user-request>`);
 
   parts.push(
-    `<current-room>\n- ${room.properties["name"] || room.id}: ${room.properties["description"] || "No description."}\n</current-room>`,
+    `<current-room>\n- ${room.name}: ${room.description || "No description."}\n</current-room>`,
   );
 
   // Show what's already in the room
   const contents = store.getContents(room.id);
-  const items = contents.filter((e) => !e.tags.has("exit") && !e.tags.has("player"));
+  const items = contents.filter((e) => !e.tags.includes("exit") && !e.tags.includes("player"));
   if (items.length > 0) {
     parts.push(`<room-contents>\n${items.map(describeEntityForLlm).join("\n")}\n</room-contents>`);
   }
@@ -199,40 +199,31 @@ export async function handleAiCreate(
     entityId = `${baseId}-${n}`;
   }
 
-  // Build properties — strip undefined values from the typed properties object
-  const properties: Record<string, unknown> = {
-    location: room.id,
-    name: response.name,
-    description: response.description,
-  };
+  // Build extra properties — strip undefined values from the typed properties object
+  const extraProps: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(response.properties)) {
-    if (value !== undefined) properties[key] = value;
+    if (value !== undefined) extraProps[key] = value;
   }
   if (response.shortDescription) {
-    properties.shortDescription = response.shortDescription;
-  }
-  if (response.aliases.length > 0) {
-    properties.aliases = response.aliases;
-  }
-  if (response.secret) {
-    properties.secret = response.secret;
+    extraProps.shortDescription = response.shortDescription;
   }
 
-  // Create the entity
-  store.create(entityId, {
-    tags: response.tags,
-    properties,
-  });
-
-  // Persist
-  await getStorage().saveAiEntity({
+  const entityRecord: AiEntityRecord = {
     createdAt: new Date().toISOString(),
     gameId,
     id: entityId,
     tags: response.tags,
-    properties,
+    name: response.name,
+    description: response.description,
+    location: room.id,
+    aliases: response.aliases.length > 0 ? response.aliases : undefined,
+    secret: response.secret || undefined,
+    properties: Object.keys(extraProps).length > 0 ? extraProps : undefined,
     authoring,
-  });
+  };
+
+  store.create(entityId, entityRecord);
+  await getStorage().saveAiEntity(entityRecord);
 
   // Remove any scenery entries that match the new entity's name/aliases
   removeMatchingScenery(store, { room, name: response.name, aliases: response.aliases });
@@ -245,11 +236,10 @@ export async function handleAiCreate(
   const entity = store.get(entityId);
   const summaryParts = [`[Created ${response.name} (${entityId})]`];
   summaryParts.push(response.description);
-  const tagList = Array.from(entity.tags).join(", ");
+  const tagList = entity.tags.join(", ");
   summaryParts.push(`Tags: ${tagList}`);
   const displayProps: string[] = [];
   for (const [key, value] of Object.entries(entity.properties)) {
-    if (key === "location" || key === "name" || key === "description") continue;
     if (key === "aliases" && Array.isArray(value)) {
       displayProps.push(`Aliases: ${value.join(", ")}`);
     } else {

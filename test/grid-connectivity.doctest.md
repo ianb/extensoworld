@@ -189,7 +189,9 @@ includes them:
 const store3 = makeStore();
 store3.create("room:cavern", {
   tags: ["room"],
-  properties: { name: "Crystal Cavern", description: "Glittering crystals line the walls.", gridX: 1, gridY: 0, gridZ: 0 },
+  name: "Crystal Cavern",
+  description: "Glittering crystals line the walls.",
+  room: { grid: { x: 1, y: 0, z: 0 } },
 });
 
 const context = buildAdjacentRoomContext(store3, { x: 0, y: 0, z: 0 });
@@ -215,7 +217,7 @@ context.includes("room:cavern")
 const store4 = makeStore();
 store4.create("room:isolated", {
   tags: ["room"],
-  properties: { name: "Isolated Room", description: "Far away.", gridX: 10, gridY: 10, gridZ: 0 },
+  name: "Isolated Room", description: "Far away.", room: { grid: { x: 10, y: 10, z: 0 } },
 });
 
 buildAdjacentRoomContext(store4, { x: 0, y: 0, z: 0 })
@@ -231,11 +233,11 @@ the context should flag it:
 const store5 = makeStore();
 store5.create("room:library", {
   tags: ["room"],
-  properties: { name: "Old Library", description: "Dusty shelves.", gridX: 0, gridY: -1, gridZ: 0 },
+  name: "Old Library", description: "Dusty shelves.", room: { grid: { x: 0, y: -1, z: 0 } },
 });
 store5.create("exit:library:south", {
   tags: ["exit"],
-  properties: { location: "room:library", direction: "south", destinationIntent: "A reading room" },
+  location: "room:library", exit: { direction: "south", destinationIntent: "A reading room" },
 });
 
 const ctx5 = buildAdjacentRoomContext(store5, { x: 0, y: 0, z: 0 });
@@ -253,7 +255,7 @@ This tests the guard in `createReturnAndAdditionalExits`.
 const store6 = makeStore();
 store6.create("room:start", {
   tags: ["room"],
-  properties: { name: "Start", description: "The start.", gridX: 0, gridY: 0, gridZ: 0 },
+  name: "Start", description: "The start.", room: { grid: { x: 0, y: 0, z: 0 } },
 });
 
 // Simulate what createReturnAndAdditionalExits does for a bad connectTo
@@ -270,15 +272,15 @@ saved.length = 0;
 const store7 = makeStore();
 store7.create("room:target", {
   tags: ["room"],
-  properties: { name: "Target", description: "Target room.", gridX: 1, gridY: 0, gridZ: 0 },
+  name: "Target", description: "Target room.", room: { grid: { x: 1, y: 0, z: 0 } },
 });
 store7.create("exit:target:west", {
   tags: ["exit"],
-  properties: { location: "room:target", direction: "west", destinationIntent: "Something to the west", name: "Old Door" },
+  location: "room:target", name: "Old Door", exit: { direction: "west", destinationIntent: "Something to the west" },
 });
 store7.create("room:new-room", {
   tags: ["room"],
-  properties: { name: "New Room", description: "A new room.", gridX: 0, gridY: 0, gridZ: 0 },
+  name: "New Room", description: "A new room.", room: { grid: { x: 0, y: 0, z: 0 } },
 });
 
 await resolveOrCreateBackExit(store7, {
@@ -291,26 +293,26 @@ await resolveOrCreateBackExit(store7, {
 });
 
 // The existing unresolved exit should now point to the new room
-store7.get("exit:target:west").properties["destination"]
+store7.get("exit:target:west").exit.destination
 => room:new-room
 ```
 
 The destinationIntent should be cleared:
 
 ``` continue
-store7.get("exit:target:west").properties["destinationIntent"]
+store7.get("exit:target:west").exit.destinationIntent
 => undefined
 ```
 
 And the AI-provided name/description should be applied:
 
 ``` continue
-store7.get("exit:target:west").properties["name"]
+store7.get("exit:target:west").name
 => Rusty Gate
 ```
 
 ``` continue
-store7.get("exit:target:west").properties["description"]
+store7.get("exit:target:west").description
 => A rusty gate leads to a new area.
 ```
 
@@ -321,11 +323,11 @@ saved.length = 0;
 const store8 = makeStore();
 store8.create("room:target2", {
   tags: ["room"],
-  properties: { name: "Target 2", description: "No exits here.", gridX: 1, gridY: 0, gridZ: 0 },
+  name: "Target 2", description: "No exits here.", room: { grid: { x: 1, y: 0, z: 0 } },
 });
 store8.create("room:new-room2", {
   tags: ["room"],
-  properties: { name: "New Room 2", description: "Fresh room.", gridX: 0, gridY: 0, gridZ: 0 },
+  name: "New Room 2", description: "Fresh room.", room: { grid: { x: 0, y: 0, z: 0 } },
 });
 
 await resolveOrCreateBackExit(store8, {
@@ -342,12 +344,12 @@ store8.has("exit:target2:west")
 ```
 
 ``` continue
-store8.get("exit:target2:west").properties["name"]
+store8.get("exit:target2:west").name
 => Crumbling Archway
 ```
 
 ``` continue
-store8.get("exit:target2:west").properties["description"]
+store8.get("exit:target2:west").description
 => An archway opens to the west.
 ```
 
@@ -358,11 +360,11 @@ saved.length = 0;
 const store8b = makeStore();
 store8b.create("room:target3", {
   tags: ["room"],
-  properties: { name: "Target 3", gridX: 1, gridY: 0, gridZ: 0 },
+  name: "Target 3", room: { grid: { x: 1, y: 0, z: 0 } },
 });
 store8b.create("room:new-room3", {
   tags: ["room"],
-  properties: { name: "New Room 3", gridX: 0, gridY: 0, gridZ: 0 },
+  name: "New Room 3", room: { grid: { x: 0, y: 0, z: 0 } },
 });
 
 await resolveOrCreateBackExit(store8b, {
@@ -372,7 +374,7 @@ await resolveOrCreateBackExit(store8b, {
   gameId: "test",
 });
 
-store8b.get("exit:target3:west").properties["name"]
+store8b.get("exit:target3:west").name
 => Exit west
 ```
 
@@ -383,13 +385,13 @@ saved.length = 0;
 const store9 = makeStore();
 store9.create("room:origin", {
   tags: ["room"],
-  properties: { name: "Origin" },
+  name: "Origin",
 });
 
 const room = store9.get("room:origin");
 await ensureGridCoords(store9, { room, gameId: "test" });
 
-store9.get("room:origin").properties["gridX"]
+store9.get("room:origin").room.grid.x
 => 0
 ```
 
@@ -399,7 +401,7 @@ Already-set coords are not overwritten:
 const store10 = makeStore();
 store10.create("room:placed", {
   tags: ["room"],
-  properties: { name: "Placed", gridX: 5, gridY: 3, gridZ: 1 },
+  name: "Placed", room: { grid: { x: 5, y: 3, z: 1 } },
 });
 
 saved.length = 0;
@@ -412,6 +414,6 @@ saved.length
 ```
 
 ``` continue
-store10.get("room:placed").properties["gridX"]
+store10.get("room:placed").room.grid.x
 => 5
 ```

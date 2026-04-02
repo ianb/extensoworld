@@ -26,24 +26,24 @@ function tag(name: string, content: string): string {
 
 function findRegion(context: PromptContext): Entity | null {
   if (!context.store) return null;
-  const locationId = context.room.properties["location"] as string | undefined;
+  const locationId = context.room.location as string | undefined;
   if (!locationId || locationId === "world") return null;
   if (!context.store.has(locationId)) return null;
   const parent = context.store.get(locationId);
-  if (parent.tags.has("region")) return parent;
+  if (parent.tags.includes("region")) return parent;
   return null;
 }
 
 function appendRegionAndRoom(sections: string[], context: PromptContext): void {
   const region = findRegion(context);
   if (region) {
-    const regionPrompt = region.properties["aiPrompt"] as string | undefined;
+    const regionPrompt = region.ai && region.ai.prompt;
     if (regionPrompt) {
       sections.push(tag("region-context", applyPromptSampling(regionPrompt)));
     }
   }
 
-  const roomPrompt = context.room.properties["aiPrompt"] as string | undefined;
+  const roomPrompt = context.room.ai && context.room.ai.prompt;
   if (roomPrompt) {
     sections.push(tag("room-context", applyPromptSampling(roomPrompt)));
   }
@@ -52,7 +52,7 @@ function appendRegionAndRoom(sections: string[], context: PromptContext): void {
 function appendRegionConversation(sections: string[], context: PromptContext): void {
   const region = findRegion(context);
   if (region) {
-    const convPrompt = region.properties["aiConversationPrompt"] as string | undefined;
+    const convPrompt = region.ai && region.ai.conversationPrompt;
     if (convPrompt) {
       sections.push(tag("region-conversation", applyPromptSampling(convPrompt)));
     }
