@@ -1,3 +1,4 @@
+import { Validator } from "@cfworker/json-schema";
 import type { JSONSchema7 } from "./json-schema.js";
 
 export interface PropertyDefinition {
@@ -29,26 +30,15 @@ export class UndefinedPropertyError extends Error {
   }
 }
 
-/**
- * Simple schema validator that handles the subset of JSON Schema we actually use:
- * type (string/boolean/number/array), format (entity-ref), enum, array items.
- * Does not use code generation, so it works in Cloudflare Workers.
- */
-function validateSchema(schema: JSONSchema7, value: unknown): string | null {
-  const expectedType = schema.type as string | undefined;
-  if (expectedType === "string") {
-    if (typeof value !== "string") return `expected string, got ${typeof value}`;
-  } else if (expectedType === "boolean") {
-    if (typeof value !== "boolean") return `expected boolean, got ${typeof value}`;
-  } else if (expectedType === "number") {
-    if (typeof value !== "number") return `expected number, got ${typeof value}`;
-  } else if (expectedType === "array") {
-    if (!Array.isArray(value)) return `expected array, got ${typeof value}`;
+const validatorCache = new WeakMap<JSONSchema7, Validator>();
+
+function getValidator(schema: JSONSchema7): Validator {
+  let validator = validatorCache.get(schema);
+  if (!validator) {
+    validator = new Validator(schema as Record<string, unknown>, "7", false);
+    validatorCache.set(schema, validator);
   }
-  if (schema.enum && !schema.enum.includes(value as string)) {
-    return `expected one of [${schema.enum.join(", ")}], got ${JSON.stringify(value)}`;
-  }
-  return null;
+  return validator;
 }
 
 export function createRegistry(definitions?: PropertyDefinition[]): PropertyRegistry {
@@ -73,9 +63,9 @@ export function validateValue(
   if (!def) {
     return [`Property "${entry.name}" is not defined in the registry`];
   }
-  const error = validateSchema(def.schema, entry.value);
-  if (error) return [`${entry.name}: ${error}`];
-  return [];
+  const result = getValidator(def.schema).validate(entry.value);
+  if (result.valid) return [];
+  return result.errors.map((e) => `${entry.name}${e.instanceLocation}: ${e.error}`);
 }
 
 /** Typed base properties shared across all games, plus arbitrary game-specific keys */
