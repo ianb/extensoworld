@@ -10,6 +10,8 @@
 import { execSync } from "node:child_process";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { deserializeEntityRow } from "../src/server/entity-serialize.js";
+import type { EntityRow as D1EntityRow } from "../src/server/d1-types.js";
 
 interface CliArgs {
   output: string;
@@ -56,17 +58,6 @@ class QueryError extends Error {
   }
 }
 
-interface EntityRow {
-  game_id: string;
-  id: string;
-  tags: string;
-  properties: string;
-  created_at: string;
-  created_by: string | null;
-  creation_source: string | null;
-  creation_command: string | null;
-}
-
 interface HandlerRow {
   game_id: string;
   name: string;
@@ -107,10 +98,10 @@ function run(): void {
   const gameFilter = game ? ` WHERE game_id = '${game}'` : "";
 
   console.log("Pulling AI entities...");
-  const entities = queryD1<EntityRow>(`SELECT * FROM ai_entities${gameFilter} ORDER BY game_id, created_at`);
+  const entities = queryD1<D1EntityRow>(`SELECT * FROM ai_entities${gameFilter} ORDER BY game_id, created_at`);
 
   // Group by game_id
-  const entitiesByGame = new Map<string, EntityRow[]>();
+  const entitiesByGame = new Map<string, D1EntityRow[]>();
   for (const row of entities) {
     const list = entitiesByGame.get(row.game_id);
     if (list) {
@@ -120,23 +111,7 @@ function run(): void {
     }
   }
   for (const [gameId, rows] of entitiesByGame) {
-    const records = rows.map((row) => {
-      const rec: Record<string, unknown> = {
-        id: row.id,
-        tags: JSON.parse(row.tags),
-        properties: JSON.parse(row.properties),
-        createdAt: row.created_at,
-        gameId: row.game_id,
-      };
-      if (row.created_by) {
-        rec.authoring = {
-          createdBy: row.created_by,
-          creationSource: row.creation_source,
-          creationCommand: row.creation_command || undefined,
-        };
-      }
-      return rec;
-    });
+    const records = rows.map((row) => deserializeEntityRow(row));
     writeJsonl(resolve(outDir, gameId, "entities.jsonl"), records);
   }
 
