@@ -43,6 +43,8 @@ export function LogEntryView({
   gameId,
   isAdmin,
   imageStatus,
+  imageVersions,
+  imagePrompts,
   generatingImages,
   onEntityClick,
   onGenerateImage,
@@ -53,6 +55,8 @@ export function LogEntryView({
   gameId: string;
   isAdmin: boolean;
   imageStatus: Record<string, boolean>;
+  imageVersions: Record<string, number>;
+  imagePrompts: Record<string, string>;
   generatingImages: Record<string, boolean>;
   onEntityClick?: (id: string) => void;
   onGenerateImage: (entityId: string) => void;
@@ -90,6 +94,8 @@ export function LogEntryView({
           gameId={gameId}
           isAdmin={isAdmin}
           imageStatus={imageStatus}
+          imageVersions={imageVersions}
+          imagePrompts={imagePrompts}
           generatingImages={generatingImages}
           onEntityClick={onEntityClick}
           onTopicClick={(word) => onFillInput(word)}

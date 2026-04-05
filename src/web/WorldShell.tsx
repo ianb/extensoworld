@@ -16,6 +16,7 @@ import type { LogEntry } from "./shell-components.js";
 interface ImageCallbacks {
   setGenerating: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   setStatus: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  setVersions: React.Dispatch<React.SetStateAction<Record<string, number>>>;
 }
 
 function triggerImageGeneration(
@@ -35,6 +36,7 @@ function triggerImageGeneration(
       cb.setGenerating((prev) => ({ ...prev, [entityId]: false }));
       if ("imageUrl" in result) {
         cb.setStatus((prev) => ({ ...prev, [entityId]: true }));
+        cb.setVersions((prev) => ({ ...prev, [entityId]: Date.now() }));
       } else if ("error" in result) {
         console.error(`Image generation failed: ${result.error}`);
         alert(`Image generation failed: ${result.error}`);
@@ -57,6 +59,30 @@ function extractImageIds(text: string): string[] {
     m = pattern.exec(text);
   }
   return ids;
+}
+
+interface ImageStatusCallbacks {
+  setStatus: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  setPrompts: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+}
+
+function fetchImageStatus(
+  params: { gameId: string; text: string },
+  cb: ImageStatusCallbacks,
+): void {
+  const ids = extractImageIds(params.text);
+  if (ids.length === 0) return;
+  trpc.entityImageStatus.query({ gameId: params.gameId, entityIds: ids }).then((status) => {
+    const s = status as Record<string, { exists: boolean; prompt: string | null }>;
+    const statusMap: Record<string, boolean> = {};
+    const promptMap: Record<string, string> = {};
+    for (const [id, info] of Object.entries(s)) {
+      statusMap[id] = info.exists;
+      if (info.prompt) promptMap[id] = info.prompt;
+    }
+    cb.setStatus((prev) => ({ ...prev, ...statusMap }));
+    cb.setPrompts((prev) => ({ ...prev, ...promptMap }));
+  });
 }
 
 export function WorldShell({
@@ -86,18 +112,18 @@ export function WorldShell({
     knownWords: string[];
   } | null>(null);
   const [imageStatus, setImageStatus] = useState<Record<string, boolean>>({});
+  const [imagePrompts, setImagePrompts] = useState<Record<string, string>>({});
   const [generatingImages, setGeneratingImages] = useState<Record<string, boolean>>({});
+  const [imageVersions, setImageVersions] = useState<Record<string, number>>({});
   const logEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const refreshImageStatus = useCallback(
-    (text: string) => {
-      const ids = extractImageIds(text);
-      if (ids.length === 0) return;
-      trpc.entityImageStatus.query({ gameId, entityIds: ids }).then((status) => {
-        setImageStatus((prev) => ({ ...prev, ...(status as Record<string, boolean>) }));
-      });
-    },
+    (text: string) =>
+      fetchImageStatus(
+        { gameId, text },
+        { setStatus: setImageStatus, setPrompts: setImagePrompts },
+      ),
     [gameId],
   );
 
@@ -153,7 +179,11 @@ export function WorldShell({
     (entityId: string) =>
       triggerImageGeneration(
         { gameId, entityId },
-        { setGenerating: setGeneratingImages, setStatus: setImageStatus },
+        {
+          setGenerating: setGeneratingImages,
+          setStatus: setImageStatus,
+          setVersions: setImageVersions,
+        },
       ),
     [gameId],
   );
@@ -179,6 +209,8 @@ export function WorldShell({
             gameId={gameId}
             isAdmin={isAdmin}
             imageStatus={imageStatus}
+            imageVersions={imageVersions}
+            imagePrompts={imagePrompts}
             generatingImages={generatingImages}
             onEntityClick={onEntityClick}
             onGenerateImage={handleGenerateImage}

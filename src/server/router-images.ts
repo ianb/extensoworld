@@ -75,9 +75,10 @@ export const imageRouter = router({
       const storage = getStorage();
       if (!storage.listWorldImages) return {};
       const images = await storage.listWorldImages(input.gameId);
-      const result: Record<string, boolean> = {};
+      const result: Record<string, { exists: boolean; prompt: string | null }> = {};
       for (const id of input.entityIds) {
-        result[id] = images.some((img) => img.imageType === `entity:${id}`);
+        const img = images.find((i) => i.imageType === `entity:${id}`);
+        result[id] = { exists: !!img, prompt: img ? img.promptUsed : null };
       }
       return result;
     }),

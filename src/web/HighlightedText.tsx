@@ -53,6 +53,8 @@ export function HighlightedText({
   onCommandClick,
   onGenerateImage,
   imageStatus,
+  imageVersions,
+  imagePrompts,
   generatingImages,
   isAdmin,
 }: {
@@ -63,6 +65,8 @@ export function HighlightedText({
   onCommandClick?: (command: string) => void;
   onGenerateImage?: (entityId: string) => void;
   imageStatus?: Record<string, boolean>;
+  imageVersions?: Record<string, number>;
+  imagePrompts?: Record<string, string>;
   generatingImages?: Record<string, boolean>;
   isAdmin?: boolean;
 }): ReactNode {
@@ -77,6 +81,8 @@ export function HighlightedText({
           entityName={seg.text}
           gameId={gameId}
           hasImage={imageStatus ? imageStatus[seg.entityId] === true : false}
+          parentVersion={imageVersions ? imageVersions[seg.entityId] || 0 : 0}
+          imageAlt={imagePrompts ? imagePrompts[seg.entityId] || "" : ""}
           generating={generatingImages ? generatingImages[seg.entityId] === true : false}
           isAdmin={isAdmin || false}
           onGenerate={onGenerateImage}
@@ -152,6 +158,8 @@ function EntityImage({
   entityName,
   gameId,
   hasImage,
+  parentVersion,
+  imageAlt,
   generating,
   isAdmin,
   onGenerate,
@@ -160,6 +168,8 @@ function EntityImage({
   entityName: string;
   gameId: string;
   hasImage: boolean;
+  parentVersion: number;
+  imageAlt: string;
   generating: boolean;
   isAdmin: boolean;
   onGenerate?: (entityId: string) => void;
@@ -167,16 +177,14 @@ function EntityImage({
   const safeId = entityId.replace(/:/g, "/");
   const isRoom = entityId.startsWith("room:");
   const [imgError, setImgError] = useState(false);
-  const [version, setVersion] = useState(() => Date.now());
   const [lightbox, setLightbox] = useState(false);
 
-  const imgSrc = `/api/images/${gameId}/entities/${safeId}.png?v=${version}`;
+  const imgSrc = `/api/images/${gameId}/entities/${safeId}.png?v=${parentVersion}`;
   const showGenButton = isAdmin && onGenerate && (!hasImage || imgError);
 
   function handleRegenerate() {
     if (!onGenerate) return;
     setImgError(false);
-    setVersion(Date.now());
     onGenerate(entityId);
   }
 
@@ -186,7 +194,7 @@ function EntityImage({
         <div className={`my-2 ${isRoom ? "mx-auto max-w-lg" : "float-right ml-3 w-32"}`}>
           <img
             src={imgSrc}
-            alt={entityName}
+            alt={imageAlt ? `[image: ${imageAlt}]` : entityName}
             className="w-full cursor-zoom-in rounded border border-content/10"
             onError={() => setImgError(true)}
             onClick={() => setLightbox(true)}
@@ -208,7 +216,7 @@ function EntityImage({
           >
             <img
               src={imgSrc}
-              alt={entityName}
+              alt={imageAlt ? `[image: ${imageAlt}]` : entityName}
               className="max-h-[90vh] max-w-[90vw] rounded shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             />
@@ -222,7 +230,6 @@ function EntityImage({
     function handleClick() {
       if (!onGenerate) return;
       setImgError(false);
-      setVersion(Date.now());
       onGenerate(entityId);
     }
     const label = entityName ? `Generate image for ${entityName}` : "Generate image";
