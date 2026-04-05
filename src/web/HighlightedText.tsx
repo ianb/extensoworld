@@ -173,6 +173,13 @@ function EntityImage({
   const imgSrc = `/api/images/${gameId}/entities/${safeId}.png?v=${version}`;
   const showGenButton = isAdmin && onGenerate && (!hasImage || imgError);
 
+  function handleRegenerate() {
+    if (!onGenerate) return;
+    setImgError(false);
+    setVersion(Date.now());
+    onGenerate(entityId);
+  }
+
   if (hasImage && !imgError) {
     return (
       <>
@@ -184,6 +191,15 @@ function EntityImage({
             onError={() => setImgError(true)}
             onClick={() => setLightbox(true)}
           />
+          {isAdmin && onGenerate ? (
+            <button
+              className="mt-1 text-xs text-content/30 hover:text-content/60 disabled:opacity-50"
+              onClick={handleRegenerate}
+              disabled={generating}
+            >
+              {generating ? "Regenerating..." : "Regenerate"}
+            </button>
+          ) : null}
         </div>
         {lightbox ? (
           <div
