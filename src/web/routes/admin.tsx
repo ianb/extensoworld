@@ -4,6 +4,11 @@ import { rootRoute } from "./__root.js";
 import { trpc } from "../trpc.js";
 import { AuthContext } from "../auth.js";
 
+interface GameLink {
+  slug: string;
+  title: string;
+}
+
 export const adminRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/admin",
@@ -76,19 +81,20 @@ function AdminPage() {
   const auth = useContext(AuthContext);
   const isAdmin = auth.user && auth.user.roles && auth.user.roles.includes("admin");
   const [rows, setRows] = useState<UserRow[]>([]);
+  const [games, setGames] = useState<GameLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAdmin) return;
-    trpc.adminDashboard
-      .query()
-      .then((data) => {
+    Promise.all([trpc.adminDashboard.query(), trpc.games.query()])
+      .then(([data, gameList]) => {
         const assembled = assembleRows(data.users as UserRecord[], {
           sessions: data.sessions as SessionSummary[],
           aiUsage: data.aiUsage as AiUsageSummary[],
         });
         setRows(assembled);
+        setGames(gameList as GameLink[]);
         setLoading(false);
       })
       .catch((err: unknown) => {
@@ -108,13 +114,17 @@ function AdminPage() {
     <div className="mx-auto max-w-5xl p-8">
       <h1 className="mb-6 text-2xl font-bold">Admin Dashboard</h1>
       <div className="mb-6">
-        <Link
-          to="/admin/images/$gameId"
-          params={{ gameId: rows[0] ? "tinkermarket" : "test" }}
-          className="text-sm text-content/50 hover:text-content/80"
-        >
-          Manage Images &rarr;
-        </Link>
+        <span className="text-sm font-bold text-content/60">Manage Images:</span>{" "}
+        {games.map((g) => (
+          <Link
+            key={g.slug}
+            to="/admin/images/$gameId"
+            params={{ gameId: g.slug }}
+            className="ml-2 text-sm text-content/50 hover:text-content/80"
+          >
+            {g.title}
+          </Link>
+        ))}
       </div>
       <table className="w-full text-sm">
         <thead>
