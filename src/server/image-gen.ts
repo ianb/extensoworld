@@ -25,15 +25,18 @@ class ImageGenConfigError extends Error {
 }
 
 class ImageGenNoPartsError extends Error {
-  constructor() {
-    super("Image generation failed: no parts in response");
+  constructor(detail: string) {
+    super(`Image generation failed: no parts in response. ${detail}`);
     this.name = "ImageGenNoPartsError";
   }
 }
 
 class ImageGenNoImageError extends Error {
-  constructor() {
-    super("Image generation failed: no image data in response");
+  constructor(responseText: string) {
+    const msg = responseText
+      ? `Image generation returned text instead of image: ${responseText}`
+      : "Image generation failed: no image data in response";
+    super(msg);
     this.name = "ImageGenNoImageError";
   }
 }
@@ -108,9 +111,11 @@ export async function generateImage(params: GenerateImageParams): Promise<Genera
     const firstCandidate = candidates && candidates[0];
     const responseParts = firstCandidate && firstCandidate.content && firstCandidate.content.parts;
     if (!responseParts) {
-      throw new ImageGenNoPartsError();
+      const blockReason = response.promptFeedback && response.promptFeedback.blockReason;
+      throw new ImageGenNoPartsError(blockReason ? `Blocked: ${blockReason}` : "");
     }
 
+    const textParts: string[] = [];
     for (const part of responseParts) {
       if (part.inlineData) {
         const bytes = Uint8Array.from(atob(part.inlineData.data), (c) => c.codePointAt(0) || 0);
@@ -119,9 +124,10 @@ export async function generateImage(params: GenerateImageParams): Promise<Genera
           mimeType: part.inlineData.mimeType || "image/png",
         };
       }
+      if (part.text) textParts.push(part.text);
     }
 
-    throw new ImageGenNoImageError();
+    throw new ImageGenNoImageError(textParts.join(" "));
   } finally {
     clearTimeout(timeout);
   }

@@ -43,7 +43,7 @@ function triggerImageGeneration(
     .catch((err: unknown) => {
       cb.setGenerating((prev) => ({ ...prev, [entityId]: false }));
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(`Image generation error: ${msg}`);
+      alert(`Image generation error: ${msg}`);
     });
 }
 

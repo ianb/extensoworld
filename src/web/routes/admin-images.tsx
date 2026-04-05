@@ -194,11 +194,13 @@ function SettingsSection({
     setSaving(true);
     setError(null);
     try {
+      const roomOverride = roomStyle && roomStyle !== defaults.imageStyleRoom ? roomStyle : null;
+      const npcOverride = npcStyle && npcStyle !== defaults.imageStyleNpc ? npcStyle : null;
       await trpc.adminUpdateImageSettings.mutate({
         gameId,
         imagesEnabled: enabled,
-        imageStyleRoom: roomStyle || null,
-        imageStyleNpc: npcStyle || null,
+        imageStyleRoom: roomOverride,
+        imageStyleNpc: npcOverride,
       });
       const updated = await trpc.adminImageSettings.query({ gameId });
       onSettingsUpdated(updated as ImageSettings | null);
