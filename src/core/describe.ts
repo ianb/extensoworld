@@ -27,7 +27,24 @@ export function describeRoomFull(
   const description = renderTemplate(room.description, { entity: room, store });
   const contents = store.getContents(room.id);
 
+  const dirOrder: Record<string, number> = {
+    north: 0,
+    south: 1,
+    east: 2,
+    west: 3,
+    northeast: 4,
+    northwest: 5,
+    southeast: 6,
+    southwest: 7,
+    up: 8,
+    down: 9,
+  };
   const exits = contents.filter((e) => e.tags.includes("exit"));
+  exits.sort((a, b) => {
+    const da = (a.exit && a.exit.direction) || "";
+    const db = (b.exit && b.exit.direction) || "";
+    return (dirOrder[da] ?? 99) - (dirOrder[db] ?? 99);
+  });
   const exitDescs = exits.map((e) => {
     const dir = (e.exit && e.exit.direction) || "?";
     const short = e.properties.shortDescription;
@@ -49,9 +66,10 @@ export function describeRoomFull(
 
   if (npcs.length > 0) {
     const npcDescs = npcs.map((e) => itemDisplay(e, store));
-    parts.push(
-      `\n${npcs.length === 1 ? `${npcDescs[0]!} is here.` : `${npcDescs.join(", ")} are here.`}`,
-    );
+    const npcImages = npcs.map((e) => `{img:${e.id}|${e.name}}`).join("");
+    const npcText =
+      npcs.length === 1 ? `${npcDescs[0]!} is here.` : `${npcDescs.join(", ")} are here.`;
+    parts.push(`\n${npcImages}\n${npcText}`);
   }
 
   if (items.length > 0) {

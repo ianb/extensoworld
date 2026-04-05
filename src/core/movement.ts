@@ -48,6 +48,7 @@ export function tryMovement(store: EntityStore, input: string): MovementResult |
     const expanded = DIRECTION_ALIASES[trimmed];
     if (expanded) {
       direction = expanded;
+      isExplicitGo = true;
     } else {
       const room = getPlayerRoom(store);
       const exits = store.getExits(room.id);

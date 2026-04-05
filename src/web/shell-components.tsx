@@ -81,7 +81,7 @@ export function LogEntryView({
               ? "text-ai/70"
               : entry.type === "event"
                 ? "text-xs text-highlight-direction/80"
-                : "text-content/70"
+                : "overflow-hidden text-content/70"
       }
     >
       {entry.type === "output" ? (

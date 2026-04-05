@@ -176,7 +176,7 @@ function EntityImage({
   if (hasImage && !imgError) {
     return (
       <>
-        <div className={`my-2 ${isRoom ? "w-full max-w-lg" : "float-right ml-3 w-32"}`}>
+        <div className={`my-2 ${isRoom ? "mx-auto max-w-lg" : "float-right ml-3 w-32"}`}>
           <img
             src={imgSrc}
             alt={entityName}
