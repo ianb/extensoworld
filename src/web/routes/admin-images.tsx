@@ -80,7 +80,7 @@ function AdminImagesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl p-8">
+    <div className="p-8">
       <div className="mb-6">
         <Link to="/admin" className="text-sm text-content/50 hover:text-content/80">
           &larr; Admin Dashboard
