@@ -36,6 +36,7 @@ export interface Entity {
   ai?: {
     prompt?: string;
     conversationPrompt?: string;
+    imagePrompt?: string;
   };
 
   /** Extensible property bag for game-specific properties */
@@ -63,6 +64,7 @@ export interface CreateEntityOptions {
   ai?: {
     prompt?: string;
     conversationPrompt?: string;
+    imagePrompt?: string;
   };
   properties?: PropertyBag;
 }
@@ -90,6 +92,7 @@ export interface EntitySnapshot {
   ai?: {
     prompt?: string;
     conversationPrompt?: string;
+    imagePrompt?: string;
   };
   properties: PropertyBag;
 }

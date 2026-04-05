@@ -67,6 +67,12 @@ function buildCreateSchema(store: EntityStore) {
       .describe(
         "Optional hidden potential not obvious from the description. Guides future AI verb resolution but is never shown to the player. Should describe interactive possibilities: an unexpected use, a hidden connection, a reaction to specific conditions. 1-2 sentences. Not everything needs a secret.",
       ),
+    imagePrompt: z
+      .string()
+      .optional()
+      .describe(
+        "For rooms and NPCs: a visual description for image generation. Describe the scene or character in concrete visual terms — colors, lighting, materials, composition. Do not repeat the style prompt. Focus on what makes THIS specific room or NPC visually distinct. 1-3 sentences. Not needed for small items or furniture.",
+      ),
     notes: z
       .string()
       .describe(
@@ -218,6 +224,7 @@ export async function handleAiCreate(
     location: room.id,
     aliases: response.aliases.length > 0 ? response.aliases : undefined,
     secret: response.secret || undefined,
+    ai: response.imagePrompt ? { imagePrompt: response.imagePrompt } : undefined,
     properties: Object.keys(extraProps).length > 0 ? extraProps : undefined,
     authoring,
   };

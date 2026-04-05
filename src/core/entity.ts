@@ -11,6 +11,7 @@ import {
 } from "./entity-errors.js";
 import type { Entity, EntitySnapshot, CreateEntityOptions } from "./entity-types.js";
 import { snapshotEntity, entityFromSnapshot } from "./entity-types.js";
+import { splitProperties } from "./entity-split-props.js";
 
 export type {
   EntityId,
@@ -73,8 +74,7 @@ export class EntityStore {
     if (this.entities.has(id)) {
       throw new DuplicateEntityError(id);
     }
-    const { typed, props } = this.splitProperties(options);
-
+    const { typed, props, exit, grid } = this.splitProps(options);
     const entity: Entity = {
       id,
       tags: options.tags ? [...options.tags] : [],
@@ -86,15 +86,17 @@ export class EntityStore {
       properties: props,
     };
     if (typed.secret !== undefined) entity.secret = typed.secret;
-    if (options.exit) entity.exit = { ...options.exit };
+    if (exit) entity.exit = { ...exit };
     if (options.room) {
       entity.room = {
         darkWhenUnlit: options.room.darkWhenUnlit || false,
         visits: options.room.visits || 0,
       };
-      if (options.room.grid) entity.room.grid = { ...options.room.grid };
+      const g = grid || options.room.grid;
+      if (g) entity.room.grid = { ...g };
     } else if (entity.tags.includes("room")) {
       entity.room = { darkWhenUnlit: false, visits: 0 };
+      if (grid) entity.room.grid = { ...grid };
     }
     if (options.ai) entity.ai = { ...options.ai };
     this.entities.set(id, entity);
@@ -144,6 +146,12 @@ export class EntityStore {
         return;
       case "visits":
         if (entity.room) entity.room.visits = (value as number) || 0;
+        return;
+      case "destination":
+        if (entity.exit) entity.exit.destination = (value as string) || undefined;
+        return;
+      case "destinationIntent":
+        if (entity.exit) entity.exit.destinationIntent = (value as string) || undefined;
         return;
     }
     if (value === null || value === undefined) {
@@ -248,26 +256,11 @@ export class EntityStore {
     return this.findByTagAt("exit", roomId);
   }
 
-  private splitProperties(opts: CreateEntityOptions) {
-    const raw = opts.properties || {};
-    const typed = {
-      name: (raw["name"] as string) || opts.name,
-      description: (raw["description"] as string) || opts.description,
-      location: (raw["location"] as string) || opts.location,
-      aliases: (raw["aliases"] as string[]) || opts.aliases,
-      secret: (raw["secret"] as string) || opts.secret,
-    };
-    const skip = new Set(["name", "description", "location", "aliases", "secret"]);
-    const props: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(raw)) {
-      if (v === null || v === undefined || skip.has(k)) continue;
-      const def = this.registry.definitions[k];
-      if (!def) throw new UndefinedPropertyError(k);
-      const errors = validateValue(this.registry, { name: k, value: v });
-      if (errors.length > 0) throw new PropertyValueError(k, errors);
-      props[k] = v;
-    }
-    return { typed, props };
+  private splitProps(opts: CreateEntityOptions) {
+    return splitProperties(opts, {
+      registry: this.registry,
+      validateRef: (def, value) => this.validateEntityRef(def, value),
+    });
   }
 
   saveState(): EntitySnapshot[] {
@@ -282,7 +275,6 @@ export class EntityStore {
       this.addToLocationIndex(entity.location, entity.id);
     }
   }
-
   private addToLocationIndex(locationId: string, entityId: string): void {
     let set = this.locationIndex.get(locationId);
     if (!set) {
@@ -291,19 +283,16 @@ export class EntityStore {
     }
     set.add(entityId);
   }
-
   private validateEntityRef(def: PropertyDefinition, value: unknown): void {
     if (def.schema.format !== "entity-ref") return;
     if (typeof value !== "string") return;
     if (value === VOID_LOCATION || value === WORLD_LOCATION) return;
     if (!this.entities.has(value)) throw new DanglingReferenceError(def.name, value);
   }
-
   private removeFromLocationIndex(locationId: string, entityId: string): void {
     const set = this.locationIndex.get(locationId);
-    if (set) {
-      set.delete(entityId);
-      if (set.size === 0) this.locationIndex.delete(locationId);
-    }
+    if (!set) return;
+    set.delete(entityId);
+    if (set.size === 0) this.locationIndex.delete(locationId);
   }
 }

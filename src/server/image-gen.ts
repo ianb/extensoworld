@@ -1,9 +1,15 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+export interface ReferenceImage {
+  data: Uint8Array;
+  mimeType: string;
+}
+
 export interface GenerateImageParams {
   prompt: string;
   stylePrompt: string;
   aspectRatio: string;
+  referenceImage?: ReferenceImage;
 }
 
 export interface GeneratedImage {
@@ -46,6 +52,14 @@ function getClient(): GoogleGenerativeAI {
   return cachedClient;
 }
 
+function uint8ToBase64(data: Uint8Array): string {
+  let binary = "";
+  for (const byte of data) {
+    binary += String.fromCodePoint(byte);
+  }
+  return btoa(binary);
+}
+
 export async function generateImage(params: GenerateImageParams): Promise<GeneratedImage> {
   const client = getClient();
   // responseModalities and imageConfig are supported by the API but not yet in the SDK types
@@ -59,25 +73,45 @@ export async function generateImage(params: GenerateImageParams): Promise<Genera
     generationConfig: generationConfig as any,
   });
 
-  const fullPrompt = [params.stylePrompt, params.prompt].join("\n\n");
+  const fullPrompt = [
+    "<style-prompt>",
+    params.stylePrompt,
+    "</style-prompt>",
+    "<subject>",
+    params.prompt,
+    "</subject>",
+  ].join("\n");
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const parts: any[] = [];
+  if (params.referenceImage) {
+    parts.push({ text: "Use this as a style reference image:" });
+    parts.push({
+      inlineData: {
+        data: uint8ToBase64(params.referenceImage.data),
+        mimeType: params.referenceImage.mimeType,
+      },
+    });
+  }
+  parts.push({ text: fullPrompt });
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), IMAGE_GEN_TIMEOUT_MS);
 
   try {
     const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+      contents: [{ role: "user", parts }],
     });
 
     const response = result.response;
     const candidates = response.candidates;
     const firstCandidate = candidates && candidates[0];
-    const parts = firstCandidate && firstCandidate.content && firstCandidate.content.parts;
-    if (!parts) {
+    const responseParts = firstCandidate && firstCandidate.content && firstCandidate.content.parts;
+    if (!responseParts) {
       throw new ImageGenNoPartsError();
     }
 
-    for (const part of parts) {
+    for (const part of responseParts) {
       if (part.inlineData) {
         const bytes = Uint8Array.from(atob(part.inlineData.data), (c) => c.codePointAt(0) || 0);
         return {

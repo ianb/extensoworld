@@ -5,14 +5,12 @@ import { getImageStorage } from "./image-storage-instance.js";
  * Returns the image from storage with appropriate headers.
  */
 export async function handleImageRequest(url: URL): Promise<Response> {
-  const match = url.pathname.match(/^\/api\/images\/([^/]+)\/([^/]+)$/);
+  const match = url.pathname.match(/^\/api\/images\/(.+)$/);
   if (!match) {
     return new Response("Not found", { status: 404 });
   }
 
-  const gameId = match[1];
-  const filename = match[2];
-  const r2Key = `${gameId}/images/${filename}`;
+  const r2Key = match[1]!;
 
   const storage = getImageStorage();
   const result = await storage.getImage(r2Key);

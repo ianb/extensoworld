@@ -1,47 +1,53 @@
-import { useState, useRef, useEffect, useContext } from "react";
+import { useState, useRef, useEffect, useContext, useCallback } from "react";
 import { trpc } from "./trpc.js";
-import { HighlightedText } from "./HighlightedText.js";
 import { useStickyState } from "./use-sticky-state.js";
-import { DebugView } from "./DebugView.js";
-import type { DebugData } from "./DebugView.js";
 import { streamCommand } from "./stream-command.js";
 import { AuthContext } from "./auth.js";
-import { BugPreviewEntry } from "./BugReportView.js";
-import type { BugPreviewData } from "./BugReportView.js";
 import { ThinkingIndicator } from "./ThinkingIndicator.js";
+import {
+  LogEntryView,
+  ShellToolbar,
+  ConversationHeader,
+  ShellInput,
+  resultToLogEntries,
+} from "./shell-components.js";
+import type { LogEntry } from "./shell-components.js";
 
-interface LogEntry {
-  type: "input" | "output" | "debug" | "system" | "event" | "bug-preview";
-  text: string;
-  debugData?: DebugData;
-  bugPreview?: BugPreviewData;
+interface ImageCallbacks {
+  setGenerating: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  setStatus: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }
 
-function resultToLogEntries(result: {
-  output: string;
-  debug?: unknown;
-  aiOutput?: string;
-  eventDescriptions?: string[];
-  bugPreview?: BugPreviewData;
-}): LogEntry[] {
-  if (result.bugPreview) {
-    return [{ type: "bug-preview", text: "", bugPreview: result.bugPreview }];
+function triggerImageGeneration(
+  params: { gameId: string; entityId: string },
+  cb: ImageCallbacks,
+): void {
+  const { gameId, entityId } = params;
+  cb.setGenerating((prev) => ({ ...prev, [entityId]: true }));
+  trpc.generateEntityImage
+    .mutate({
+      gameId,
+      entityId,
+      entityType: entityId.startsWith("room:") ? "room" : "npc",
+      imagePrompt: "",
+    })
+    .then((result) => {
+      cb.setGenerating((prev) => ({ ...prev, [entityId]: false }));
+      if ("imageUrl" in result) cb.setStatus((prev) => ({ ...prev, [entityId]: true }));
+    })
+    .catch(() => cb.setGenerating((prev) => ({ ...prev, [entityId]: false })));
+}
+
+/** Extract {img:entityId|name} markers from output text */
+function extractImageIds(text: string): string[] {
+  const pattern = /{img:([^|}]+)/g;
+  const ids: string[] = [];
+  let m = pattern.exec(text);
+  while (m !== null) {
+    ids.push(m[1]!);
+    m = pattern.exec(text);
   }
-  const entries: LogEntry[] = [];
-  const aiOutput = "aiOutput" in result ? (result.aiOutput as string) : null;
-  if (aiOutput) {
-    entries.push({ type: "system", text: aiOutput });
-  }
-  entries.push({ type: "output", text: result.output as string });
-  if (result.eventDescriptions && result.eventDescriptions.length > 0) {
-    for (const desc of result.eventDescriptions) {
-      entries.push({ type: "event", text: desc });
-    }
-  }
-  if ("debug" in result && result.debug) {
-    entries.push({ type: "debug", text: "", debugData: result.debug as DebugData });
-  }
-  return entries;
+  return ids;
 }
 
 export function WorldShell({
@@ -62,91 +68,96 @@ export function WorldShell({
   const [loading, setLoading] = useState(false);
   const [loadingPhase, setLoadingPhase] = useState<"thinking" | "ai" | null>(null);
   const auth = useContext(AuthContext);
-  const canDebug = auth.user && auth.user.roles ? auth.user.roles.includes("debug") : false;
+  const roles = auth.user && auth.user.roles ? auth.user.roles : [];
+  const canDebug = roles.includes("debug");
+  const isAdmin = roles.includes("admin");
   const [debugMode, setDebugMode] = useStickyState("extenso:debugMode", false);
   const [conversationMode, setConversationMode] = useState<{
     npcName: string;
     knownWords: string[];
   } | null>(null);
+  const [imageStatus, setImageStatus] = useState<Record<string, boolean>>({});
+  const [generatingImages, setGeneratingImages] = useState<Record<string, boolean>>({});
   const logEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const refreshImageStatus = useCallback(
+    (text: string) => {
+      const ids = extractImageIds(text);
+      if (ids.length === 0) return;
+      trpc.entityImageStatus.query({ gameId, entityIds: ids }).then((status) => {
+        setImageStatus((prev) => ({ ...prev, ...(status as Record<string, boolean>) }));
+      });
+    },
+    [gameId],
+  );
 
   useEffect(() => {
     trpc.look.query({ gameId }).then((result) => {
       setLog([{ type: "output", text: result.output }]);
+      refreshImageStatus(result.output);
     });
-  }, [gameId]);
+  }, [gameId, refreshImageStatus]);
 
   useEffect(() => {
-    if (logEndRef.current) {
-      logEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
+    if (logEndRef.current) logEndRef.current.scrollIntoView({ behavior: "smooth" });
   }, [log]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!input.trim() || loading) return;
-
-    const command = input;
-    setInput("");
-    setLoading(true);
-    setLoadingPhase("thinking");
-
-    setLog((prev) => [...prev, { type: "input", text: `> ${command}` }]);
-
-    let result;
-    try {
-      result = await streamCommand({
-        gameId,
-        text: command,
-        debug: debugMode,
-        onPhase(phase) {
-          if (phase === "ai") setLoadingPhase("ai");
-        },
-      });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      setLog((prev) => [...prev, { type: "output", text: `{!Error: ${message}!}` }]);
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!input.trim() || loading) return;
+      const command = input;
+      setInput("");
+      setLoading(true);
+      setLoadingPhase("thinking");
+      setLog((prev) => [...prev, { type: "input", text: `> ${command}` }]);
+      try {
+        const result = await streamCommand({
+          gameId,
+          text: command,
+          debug: debugMode,
+          onPhase(phase) {
+            if (phase === "ai") setLoadingPhase("ai");
+          },
+        });
+        setLog((prev) => [...prev, ...resultToLogEntries(result)]);
+        if ("conversationMode" in result) {
+          setConversationMode(
+            (result.conversationMode as { npcName: string; knownWords: string[] } | null) || null,
+          );
+        }
+        refreshImageStatus(result.output);
+        if (onCommandComplete) onCommandComplete();
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        setLog((prev) => [...prev, { type: "output", text: `{!Error: ${message}!}` }]);
+      }
       setLoading(false);
       setLoadingPhase(null);
-      return;
-    }
-    const entries = resultToLogEntries(result);
-    if ("conversationMode" in result) {
-      const mode = result.conversationMode as { npcName: string; knownWords: string[] } | null;
-      setConversationMode(mode || null);
-    }
-    setLog((prev) => [...prev, ...entries]);
-    setLoading(false);
-    setLoadingPhase(null);
-    if (onCommandComplete) onCommandComplete();
-    if (inputRef.current) inputRef.current.focus();
-  }
+      if (inputRef.current) inputRef.current.focus();
+    },
+    [input, loading, gameId, debugMode, refreshImageStatus, onCommandComplete],
+  );
+
+  const handleGenerateImage = useCallback(
+    (entityId: string) =>
+      triggerImageGeneration(
+        { gameId, entityId },
+        { setGenerating: setGeneratingImages, setStatus: setImageStatus },
+      ),
+    [gameId],
+  );
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-end gap-2 py-1">
-        {mapButton}
-        {canDebug ? (
-          <label className="flex cursor-pointer items-center gap-2 text-xs text-content/40">
-            <input
-              type="checkbox"
-              checked={debugMode}
-              onChange={(e) => setDebugMode(e.target.checked)}
-              className="accent-accent"
-            />
-            Debug
-          </label>
-        ) : null}
-      </div>
-      {conversationMode ? (
-        <div className="flex items-center gap-2 rounded-t-lg border-x border-t border-convo/50 bg-convo-bg px-3 py-2 text-sm text-convo/80">
-          <span className="font-bold">{conversationMode.npcName}</span>
-          <span className="ml-auto text-xs text-convo/50">
-            Type a topic word, or &quot;bye&quot; to leave
-          </span>
-        </div>
-      ) : null}
+      <ShellToolbar
+        canDebug={canDebug}
+        debugMode={debugMode}
+        setDebugMode={setDebugMode}
+        mapButton={mapButton}
+      />
+      {conversationMode ? <ConversationHeader npcName={conversationMode.npcName} /> : null}
       <div
         className={`flex-1 overflow-y-auto p-4 font-mono text-sm whitespace-pre-wrap ${
           conversationMode ? "border-x border-convo/50 bg-page" : "rounded-t-lg bg-surface"
@@ -156,7 +167,12 @@ export function WorldShell({
           <LogEntryView
             key={i}
             entry={entry}
+            gameId={gameId}
+            isAdmin={isAdmin}
+            imageStatus={imageStatus}
+            generatingImages={generatingImages}
             onEntityClick={onEntityClick}
+            onGenerateImage={handleGenerateImage}
             onFillInput={(text) => {
               setInput(text);
               requestAnimationFrame(() => {
@@ -171,88 +187,14 @@ export function WorldShell({
         ) : null}
         <div ref={logEndRef} />
       </div>
-      <form
+      <ShellInput
+        input={input}
+        setInput={setInput}
+        loading={loading}
+        conversationMode={!!conversationMode}
+        inputRef={inputRef}
         onSubmit={handleSubmit}
-        className={`flex gap-2 rounded-b-lg p-2 ${conversationMode ? "border-x border-b border-convo/50 bg-page" : "bg-surface"}`}
-      >
-        <input
-          ref={inputRef}
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={conversationMode ? "Say a topic word..." : "Enter command..."}
-          className={`flex-1 rounded border px-3 py-2 font-mono text-sm text-content focus:outline-none ${
-            conversationMode
-              ? "border-convo/50 bg-page placeholder-convo/40 focus:border-convo"
-              : "border-content/15 bg-surface placeholder-content/40 focus:border-accent"
-          }`}
-          autoFocus
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded bg-accent-bold px-4 py-2 font-mono text-sm text-content hover:bg-accent-bold/80 disabled:opacity-50"
-        >
-          Send
-        </button>
-      </form>
-    </div>
-  );
-}
-
-function LogEntryView({
-  entry,
-  onEntityClick,
-  onFillInput,
-  onLogAppend,
-}: {
-  entry: LogEntry;
-  onEntityClick?: (id: string) => void;
-  onFillInput: (text: string) => void;
-  onLogAppend: (entries: LogEntry[]) => void;
-}) {
-  if (entry.type === "bug-preview" && entry.bugPreview) {
-    return (
-      <BugPreviewEntry
-        preview={entry.bugPreview}
-        onResolved={(msg, isError) => {
-          const type = isError ? "output" : "system";
-          onLogAppend([{ type, text: msg }]);
-        }}
       />
-    );
-  }
-  return (
-    <div
-      className={
-        entry.type === "input"
-          ? "text-accent"
-          : entry.type === "debug"
-            ? "mt-1 border-l-2 border-caution/50 pl-2 text-xs text-caution/70"
-            : entry.type === "system"
-              ? "text-ai/70"
-              : entry.type === "event"
-                ? "text-xs text-highlight-direction/80"
-                : "text-content/70"
-      }
-    >
-      {entry.type === "output" ? (
-        <HighlightedText
-          text={entry.text}
-          onEntityClick={onEntityClick}
-          onTopicClick={(word) => onFillInput(word)}
-          onCommandClick={(cmd) => onFillInput(cmd)}
-        />
-      ) : entry.type === "debug" && entry.debugData ? (
-        <DebugView debug={entry.debugData} />
-      ) : entry.type === "event" ? (
-        <span>
-          <span className="mr-1">&#x25C6;</span>
-          {entry.text}
-        </span>
-      ) : (
-        entry.text
-      )}
     </div>
   );
 }

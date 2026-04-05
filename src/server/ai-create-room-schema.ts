@@ -30,6 +30,12 @@ export function buildRoomSchema(store: EntityStore) {
         .describe(
           "Optional hidden interactive potential (not shown to player). A hidden mechanism, reaction to specific actions, or connection to nearby areas. 1-2 sentences.",
         ),
+      imagePrompt: z
+        .string()
+        .optional()
+        .describe(
+          "A visual description for image generation. Describe the scene in concrete visual terms — colors, lighting, materials, spatial layout, atmosphere. Focus on what makes THIS room visually distinct. Do not repeat the style prompt. 1-3 sentences.",
+        ),
       returnExitName: z
         .string()
         .optional()

@@ -1,10 +1,11 @@
+import { useState } from "react";
 import type { ReactNode } from "react";
 
 const HIGHLIGHT_PATTERN =
-  /{{([^|]+)\|([^}]+)}}|\[\[([^\]]+)]]|<<([^>]+)>>|\(\(([^|]+)\|([^)]+)\)\)|{!([^!]+)!}/g;
+  /{img:([^|}]+)\|?([^}]*)}|{{([^|]+)\|([^}]+)}}|\[\[([^\]]+)]]|<<([^>]+)>>|\(\(([^|]+)\|([^)]+)\)\)|{!([^!]+)!}/g;
 
 interface TextSegment {
-  type: "text" | "entity" | "topic" | "direction" | "command" | "refusal";
+  type: "text" | "entity" | "topic" | "direction" | "command" | "refusal" | "image";
   text: string;
   entityId?: string;
   command?: string;
@@ -20,16 +21,18 @@ function parseSegments(text: string): TextSegment[] {
     if (match.index > lastIndex) {
       segments.push({ type: "text", text: text.slice(lastIndex, match.index) });
     }
-    if (match[1] && match[2]) {
-      segments.push({ type: "entity", text: match[2], entityId: match[1] });
-    } else if (match[3]) {
-      segments.push({ type: "topic", text: match[3] });
-    } else if (match[4]) {
-      segments.push({ type: "direction", text: match[4] });
-    } else if (match[5] && match[6]) {
-      segments.push({ type: "command", text: match[6], command: match[5] });
-    } else if (match[7]) {
-      segments.push({ type: "refusal", text: match[7] });
+    if (match[1]) {
+      segments.push({ type: "image", text: match[2] || "", entityId: match[1] });
+    } else if (match[3] && match[4]) {
+      segments.push({ type: "entity", text: match[4], entityId: match[3] });
+    } else if (match[5]) {
+      segments.push({ type: "topic", text: match[5] });
+    } else if (match[6]) {
+      segments.push({ type: "direction", text: match[6] });
+    } else if (match[7] && match[8]) {
+      segments.push({ type: "command", text: match[8], command: match[7] });
+    } else if (match[9]) {
+      segments.push({ type: "refusal", text: match[9] });
     }
     lastIndex = match.index + match[0].length;
     match = HIGHLIGHT_PATTERN.exec(text);
@@ -44,18 +47,42 @@ function parseSegments(text: string): TextSegment[] {
 
 export function HighlightedText({
   text,
+  gameId,
   onEntityClick,
   onTopicClick,
   onCommandClick,
+  onGenerateImage,
+  imageStatus,
+  generatingImages,
+  isAdmin,
 }: {
   text: string;
+  gameId?: string;
   onEntityClick?: (entityId: string) => void;
   onTopicClick?: (word: string) => void;
   onCommandClick?: (command: string) => void;
+  onGenerateImage?: (entityId: string) => void;
+  imageStatus?: Record<string, boolean>;
+  generatingImages?: Record<string, boolean>;
+  isAdmin?: boolean;
 }): ReactNode {
   const segments = parseSegments(text);
 
   return segments.map((seg, i) => {
+    if (seg.type === "image" && seg.entityId && gameId) {
+      return (
+        <EntityImage
+          key={i}
+          entityId={seg.entityId}
+          entityName={seg.text}
+          gameId={gameId}
+          hasImage={imageStatus ? imageStatus[seg.entityId] === true : false}
+          generating={generatingImages ? generatingImages[seg.entityId] === true : false}
+          isAdmin={isAdmin || false}
+          onGenerate={onGenerateImage}
+        />
+      );
+    }
     if (seg.type === "entity") {
       const isRoom = seg.entityId ? seg.entityId.startsWith("room:") : false;
       return (
@@ -118,4 +145,83 @@ export function HighlightedText({
     }
     return <span key={i}>{seg.text}</span>;
   });
+}
+
+function EntityImage({
+  entityId,
+  entityName,
+  gameId,
+  hasImage,
+  generating,
+  isAdmin,
+  onGenerate,
+}: {
+  entityId: string;
+  entityName: string;
+  gameId: string;
+  hasImage: boolean;
+  generating: boolean;
+  isAdmin: boolean;
+  onGenerate?: (entityId: string) => void;
+}) {
+  const safeId = entityId.replace(/:/g, "/");
+  const isRoom = entityId.startsWith("room:");
+  const [imgError, setImgError] = useState(false);
+  const [version, setVersion] = useState(() => Date.now());
+  const [lightbox, setLightbox] = useState(false);
+
+  const imgSrc = `/api/images/${gameId}/entities/${safeId}.png?v=${version}`;
+  const showGenButton = isAdmin && onGenerate && (!hasImage || imgError);
+
+  if (hasImage && !imgError) {
+    return (
+      <>
+        <div className={`my-2 ${isRoom ? "w-full max-w-lg" : "float-right ml-3 w-32"}`}>
+          <img
+            src={imgSrc}
+            alt={entityName}
+            className="w-full cursor-zoom-in rounded border border-content/10"
+            onError={() => setImgError(true)}
+            onClick={() => setLightbox(true)}
+          />
+        </div>
+        {lightbox ? (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+            onClick={() => setLightbox(false)}
+          >
+            <img
+              src={imgSrc}
+              alt={entityName}
+              className="max-h-[90vh] max-w-[90vw] rounded shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        ) : null}
+      </>
+    );
+  }
+
+  if (showGenButton) {
+    function handleClick() {
+      if (!onGenerate) return;
+      setImgError(false);
+      setVersion(Date.now());
+      onGenerate(entityId);
+    }
+    const label = entityName ? `Generate image for ${entityName}` : "Generate image";
+    return (
+      <div className="my-1">
+        <button
+          className="rounded border border-content/20 px-2 py-1 text-xs text-content/40 hover:bg-content/10 hover:text-content/60 disabled:opacity-50"
+          onClick={handleClick}
+          disabled={generating}
+        >
+          {generating ? "Generating..." : label}
+        </button>
+      </div>
+    );
+  }
+
+  return null;
 }

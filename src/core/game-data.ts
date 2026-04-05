@@ -98,6 +98,7 @@ export interface EntityData {
   ai?: {
     prompt?: string;
     conversationPrompt?: string;
+    imagePrompt?: string;
   };
   properties?: Record<string, unknown>;
 }

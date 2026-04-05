@@ -154,12 +154,17 @@ export async function handleAiCreateRoom(
     description: roomData.description,
     ...roomData.properties,
     ...(roomData.secret ? { secret: roomData.secret } : {}),
-    ...(newCoords ? { gridX: newCoords.x, gridY: newCoords.y, gridZ: newCoords.z } : {}),
   });
+  if (newCoords) {
+    roomProps.gridX = newCoords.x;
+    roomProps.gridY = newCoords.y;
+    roomProps.gridZ = newCoords.z;
+  }
   await createAndSave(store, {
     id: roomId,
     tags: roomData.tags,
     properties: roomProps,
+    ai: roomData.imagePrompt ? { imagePrompt: roomData.imagePrompt } : undefined,
     gameId,
     authoring,
   });
@@ -230,52 +235,43 @@ export async function handleAiCreateRoom(
   };
 }
 
+interface ExitCreationParams {
+  roomSlug: string;
+  roomId: string;
+  sourceRoom: Entity;
+  direction: string;
+  roomData: {
+    returnExitName?: string;
+    returnExitDescription?: string;
+    additionalExits: Array<{
+      direction: string;
+      name: string;
+      description: string;
+      destinationIntent?: string;
+      connectTo?: string;
+      backExitName?: string;
+      backExitDescription?: string;
+      aliases: string[];
+      properties: Record<string, unknown>;
+    }>;
+  };
+  gameId: string;
+  authoring: AuthoringInfo;
+}
+
 async function createReturnAndAdditionalExits(
   store: EntityStore,
-  {
-    roomSlug,
-    roomId,
-    sourceRoom,
-    direction,
-    roomData,
-    gameId,
-    authoring,
-  }: {
-    roomSlug: string;
-    roomId: string;
-    sourceRoom: Entity;
-    direction: string;
-    roomData: {
-      returnExitName?: string;
-      returnExitDescription?: string;
-      additionalExits: Array<{
-        direction: string;
-        name: string;
-        description: string;
-        destinationIntent?: string;
-        connectTo?: string;
-        backExitName?: string;
-        backExitDescription?: string;
-        aliases: string[];
-        properties: Record<string, unknown>;
-      }>;
-    };
-    gameId: string;
-    authoring: AuthoringInfo;
-  },
+  { roomSlug, roomId, sourceRoom, direction, roomData, gameId, authoring }: ExitCreationParams,
 ): Promise<void> {
   const returnDir = reverseDirection(direction);
   const srcName = sourceRoom.name;
   await createAndSave(store, {
     id: `exit:${roomSlug}:${returnDir}`,
     tags: ["exit"],
-    properties: {
-      location: roomId,
-      direction: returnDir,
-      destination: sourceRoom.id,
-      name: roomData.returnExitName || `Exit ${returnDir}`,
-      description: roomData.returnExitDescription || `Leads back to ${srcName}.`,
-    },
+    name: roomData.returnExitName || `Exit ${returnDir}`,
+    description: roomData.returnExitDescription || `Leads back to ${srcName}.`,
+    location: roomId,
+    exit: { direction: returnDir, destination: sourceRoom.id },
     gameId,
     authoring,
   });
@@ -284,17 +280,23 @@ async function createReturnAndAdditionalExits(
     if (store.has(eid)) continue;
     const isConnected = ed.connectTo && store.has(ed.connectTo);
     const ep = filterKnownProperties(store, {
-      location: roomId,
-      direction: ed.direction,
       name: ed.name,
       description: ed.description,
-      ...(isConnected
-        ? { destination: ed.connectTo }
-        : { destinationIntent: ed.destinationIntent }),
       ...ed.properties,
     });
     if (ed.aliases.length > 0) ep.aliases = ed.aliases;
-    await createAndSave(store, { id: eid, tags: ["exit"], properties: ep, gameId, authoring });
+    const exitData = isConnected
+      ? { direction: ed.direction, destination: ed.connectTo as string }
+      : { direction: ed.direction, destinationIntent: ed.destinationIntent };
+    await createAndSave(store, {
+      id: eid,
+      tags: ["exit"],
+      properties: ep,
+      location: roomId,
+      exit: exitData,
+      gameId,
+      authoring,
+    });
     if (isConnected) {
       await resolveOrCreateBackExit(store, {
         targetRoomId: ed.connectTo!,

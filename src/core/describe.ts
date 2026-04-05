@@ -45,7 +45,7 @@ export function describeRoomFull(
   const nonExits = contents.filter((e) => !e.tags.includes("exit") && e.id !== playerId);
   const npcs = nonExits.filter((e) => e.tags.includes("npc"));
   const items = nonExits.filter((e) => !e.tags.includes("npc"));
-  const parts = [`${name}\n\n${description}`];
+  const parts = [`${name}\n{img:${room.id}|${room.name}}\n${description}`];
 
   if (npcs.length > 0) {
     const npcDescs = npcs.map((e) => itemDisplay(e, store));
