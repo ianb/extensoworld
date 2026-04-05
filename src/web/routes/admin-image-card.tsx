@@ -51,7 +51,9 @@ export function ImageCard({
     }
   }
 
-  const imageUrl = existing ? `/api/images/${gameId}/${imageType}.png?v=${imageVersion}` : null;
+  const imageUrl = existing
+    ? `/api/images/${gameId}/images/${imageType}.png?v=${imageVersion}`
+    : null;
 
   return (
     <div className="rounded border border-content/20 p-4">
