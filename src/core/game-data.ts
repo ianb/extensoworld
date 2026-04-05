@@ -10,6 +10,10 @@ export interface GamePrompts {
   worldCreate?: string;
   /** Additional guidance for NPC conversation AI */
   worldConversation?: string;
+  /** Default style prompt for room image generation */
+  imageStyleRoom?: string;
+  /** Default style prompt for NPC image generation */
+  imageStyleNpc?: string;
 }
 
 /** Top-level game data file format — loaded from JSON */

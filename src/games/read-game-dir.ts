@@ -67,6 +67,8 @@ export function readPrompts(dir: string): GamePrompts | null {
     ["world-verb.md", "worldVerb"],
     ["world-create.md", "worldCreate"],
     ["world-conversation.md", "worldConversation"],
+    ["image-style-room.md", "imageStyleRoom"],
+    ["image-style-npc.md", "imageStyleNpc"],
   ];
 
   const prompts: GamePrompts = {};

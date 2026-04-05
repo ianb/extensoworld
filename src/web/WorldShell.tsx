@@ -33,9 +33,18 @@ function triggerImageGeneration(
     })
     .then((result) => {
       cb.setGenerating((prev) => ({ ...prev, [entityId]: false }));
-      if ("imageUrl" in result) cb.setStatus((prev) => ({ ...prev, [entityId]: true }));
+      if ("imageUrl" in result) {
+        cb.setStatus((prev) => ({ ...prev, [entityId]: true }));
+      } else if ("error" in result) {
+        console.error(`Image generation failed: ${result.error}`);
+        alert(`Image generation failed: ${result.error}`);
+      }
     })
-    .catch(() => cb.setGenerating((prev) => ({ ...prev, [entityId]: false })));
+    .catch((err: unknown) => {
+      cb.setGenerating((prev) => ({ ...prev, [entityId]: false }));
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`Image generation error: ${msg}`);
+    });
 }
 
 /** Extract {img:entityId|name} markers from output text */

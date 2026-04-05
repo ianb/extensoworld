@@ -6,13 +6,65 @@ import { getImageStorage } from "./image-storage-instance.js";
 import { generateImage } from "./image-gen.js";
 import { getGame } from "../games/registry.js";
 import { getLlm } from "./llm.js";
+import type { ImageStorage } from "./image-storage.js";
 
-/**
- * Image endpoints available to authed users (not just admins).
- * Entity image generation requires admin role check inline.
- */
+/** Resolve style prompt from D1 settings, falling back to game file prompts */
+async function resolveStylePrompt(gameId: string, entityType: "room" | "npc"): Promise<string> {
+  const storage = getStorage();
+  const settings = storage.getImageSettings ? await storage.getImageSettings(gameId) : null;
+  const fromSettings =
+    entityType === "room"
+      ? (settings && settings.imageStyleRoom) || ""
+      : (settings && settings.imageStyleNpc) || "";
+  if (fromSettings) return fromSettings;
+  const def = getGame(gameId);
+  if (!def) return "";
+  const prompts = def.create().prompts;
+  if (!prompts) return "";
+  return (entityType === "room" ? prompts.imageStyleRoom : prompts.imageStyleNpc) || "";
+}
+
+/** Resolve image prompt from input, entity ai field, or LLM generation from description */
+async function resolveImagePrompt(input: {
+  imagePrompt: string;
+  gameId: string;
+  entityId: string;
+  entityType: string;
+}): Promise<string> {
+  if (input.imagePrompt) return input.imagePrompt;
+  const def = getGame(input.gameId);
+  if (!def) return "";
+  const instance = def.create();
+  if (!instance.store.has(input.entityId)) return "";
+  const entity = instance.store.get(input.entityId);
+  const aiPrompt = entity.ai && entity.ai.imagePrompt;
+  if (aiPrompt) return aiPrompt;
+  if (!entity.description) return "";
+  const result = await generateText({
+    model: getLlm(),
+    system: `You write concise image generation prompts. Given a text description of a ${input.entityType} in a game world, produce a visual description suitable for image generation. Focus on concrete visual details: colors, lighting, materials, composition, atmosphere. 1-3 sentences. Output ONLY the visual prompt, nothing else.`,
+    prompt: entity.description,
+  });
+  return result.text.trim();
+}
+
+/** Load reference image bytes if available */
+async function loadReferenceImage(
+  imageStorage: ImageStorage,
+  query: { gameId: string; entityType: "room" | "npc" },
+): Promise<{ data: Uint8Array; mimeType: string } | undefined> {
+  const refType = query.entityType === "room" ? "room-reference" : "npc-reference";
+  const refKey = `${query.gameId}/images/${refType}.png`;
+  const refResult = await imageStorage.getImage(refKey);
+  if (!refResult) return undefined;
+  const data =
+    refResult.data instanceof Uint8Array
+      ? refResult.data
+      : new Uint8Array(await new Response(refResult.data).arrayBuffer());
+  return { data, mimeType: refResult.mimeType };
+}
+
 export const imageRouter = router({
-  /** Check which entities have generated images */
   entityImageStatus: authedProcedure
     .input(z.object({ gameId: z.string(), entityIds: z.array(z.string()) }))
     .query(async ({ input }) => {
@@ -21,13 +73,11 @@ export const imageRouter = router({
       const images = await storage.listWorldImages(input.gameId);
       const result: Record<string, boolean> = {};
       for (const id of input.entityIds) {
-        const imageType = `entity:${id}`;
-        result[id] = images.some((img) => img.imageType === imageType);
+        result[id] = images.some((img) => img.imageType === `entity:${id}`);
       }
       return result;
     }),
 
-  /** Generate an image for a specific entity (admin only) */
   generateEntityImage: authedProcedure
     .input(
       z.object({
@@ -42,61 +92,21 @@ export const imageRouter = router({
         return { error: "Admin access required" };
       }
 
-      const storage = getStorage();
-      const settings = storage.getImageSettings
-        ? await storage.getImageSettings(input.gameId)
-        : null;
-
-      const stylePrompt =
-        input.entityType === "room"
-          ? (settings && settings.imageStyleRoom) || ""
-          : (settings && settings.imageStyleNpc) || "";
-
+      const stylePrompt = await resolveStylePrompt(input.gameId, input.entityType);
       if (!stylePrompt) {
         return { error: "No style prompt configured for this image type" };
       }
 
-      // Look up entity's imagePrompt from game state
-      let imagePrompt = input.imagePrompt;
-      let entityDescription = "";
+      const imagePrompt = await resolveImagePrompt(input);
       if (!imagePrompt) {
-        const def = getGame(input.gameId);
-        if (def) {
-          const instance = def.create();
-          if (instance.store.has(input.entityId)) {
-            const entity = instance.store.get(input.entityId);
-            imagePrompt = (entity.ai && entity.ai.imagePrompt) || "";
-            entityDescription = entity.description;
-          }
-        }
-      }
-      // Generate an imagePrompt via LLM if the entity doesn't have one
-      if (!imagePrompt && entityDescription) {
-        const result = await generateText({
-          model: getLlm(),
-          system: `You write concise image generation prompts. Given a text description of a ${input.entityType} in a game world, produce a visual description suitable for image generation. Focus on concrete visual details: colors, lighting, materials, composition, atmosphere. 1-3 sentences. Output ONLY the visual prompt, nothing else.`,
-          prompt: entityDescription,
-        });
-        imagePrompt = result.text.trim();
-      }
-      if (!imagePrompt) {
-        return { error: "Entity not found" };
+        return { error: "Entity not found or no description available" };
       }
 
-      // Load reference image if available
-      const refType = input.entityType === "room" ? "room-reference" : "npc-reference";
-      const refKey = `${input.gameId}/images/${refType}.png`;
       const imageStorage = getImageStorage();
-      const refResult = await imageStorage.getImage(refKey);
-      let referenceImage: { data: Uint8Array; mimeType: string } | undefined;
-      if (refResult) {
-        const data =
-          refResult.data instanceof Uint8Array
-            ? refResult.data
-            : new Uint8Array(await new Response(refResult.data).arrayBuffer());
-        referenceImage = { data, mimeType: refResult.mimeType };
-      }
-
+      const referenceImage = await loadReferenceImage(imageStorage, {
+        gameId: input.gameId,
+        entityType: input.entityType,
+      });
       const aspectRatio = input.entityType === "room" ? "16:9" : "3:4";
       const generated = await generateImage({
         prompt: imagePrompt,
@@ -113,7 +123,7 @@ export const imageRouter = router({
         mimeType: generated.mimeType,
       });
 
-      const now = new Date().toISOString();
+      const storage = getStorage();
       const record = {
         gameId: input.gameId,
         imageType: `entity:${input.entityId}`,
@@ -123,9 +133,8 @@ export const imageRouter = router({
         mimeType: generated.mimeType,
         width: null,
         height: null,
-        createdAt: now,
+        createdAt: new Date().toISOString(),
       };
-
       if (storage.saveWorldImage) {
         await storage.saveWorldImage(record);
       }
