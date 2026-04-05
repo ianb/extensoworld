@@ -169,4 +169,42 @@
     --th-added: oklch(0.65 0.18 150); /* green status */
     --th-removed: oklch(0.6 0.22 30); /* red status */
   }
+
+  /* Tinkermarket: warm fantasy bazaar, brass & lamplight */
+  [data-theme="tinkermarket"] body {
+    font-size: 1.18rem;
+    line-height: 1.75;
+  }
+
+  [data-theme="tinkermarket"] {
+    --th-font-sans: "Spectral", serif;
+    --th-font-mono: "Spectral", serif;
+    --th-font-heading: "Cinzel", serif;
+
+    --th-page: oklch(0.15 0.02 60); /* deep warm charcoal */
+    --th-surface: oklch(0.20 0.025 55); /* dark aged wood */
+    --th-input: oklch(0.25 0.02 55); /* warm recessed panel */
+
+    --th-content: oklch(0.88 0.03 75); /* warm cream text */
+
+    --th-accent: oklch(0.68 0.14 70); /* warm brass */
+    --th-accent-hover: oklch(0.76 0.12 70); /* polished brass */
+    --th-accent-bold: oklch(0.52 0.14 65); /* deep bronze */
+
+    --th-convo: oklch(0.62 0.10 160); /* sage green */
+    --th-convo-bg: oklch(0.18 0.03 160); /* dark sage panel */
+
+    --th-highlight-entity: oklch(0.72 0.15 75); /* bright brass */
+    --th-highlight-topic: oklch(0.65 0.10 160); /* warm sage */
+    --th-highlight-direction: oklch(0.65 0.12 130); /* warm green */
+
+    --th-ai: oklch(0.60 0.14 310); /* warm plum */
+    --th-command: oklch(0.55 0.15 15); /* warm burgundy */
+
+    --th-danger: oklch(0.55 0.18 20); /* deep crimson */
+    --th-caution: oklch(0.65 0.14 80); /* dark amber */
+
+    --th-added: oklch(0.60 0.15 145); /* warm green */
+    --th-removed: oklch(0.55 0.18 20); /* deep crimson */
+  }
 }
