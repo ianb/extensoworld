@@ -115,15 +115,17 @@ function AdminPage() {
       <h1 className="mb-6 text-2xl font-bold">Admin Dashboard</h1>
       <div className="mb-6">
         <span className="text-sm font-bold text-content/60">Manage Images:</span>{" "}
-        {games.map((g) => (
-          <Link
-            key={g.slug}
-            to="/admin/images/$gameId"
-            params={{ gameId: g.slug }}
-            className="ml-2 text-sm text-content/50 hover:text-content/80"
-          >
-            {g.title}
-          </Link>
+        {games.map((g, i) => (
+          <span key={g.slug}>
+            {i > 0 ? <span className="text-content/30"> | </span> : null}
+            <Link
+              to="/admin/images/$gameId"
+              params={{ gameId: g.slug }}
+              className="text-sm text-content/50 hover:text-content/80"
+            >
+              {g.title}
+            </Link>
+          </span>
         ))}
       </div>
       <table className="w-full text-sm">
