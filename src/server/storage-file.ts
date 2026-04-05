@@ -51,11 +51,11 @@ export class FileStorage implements RuntimeStorage {
   // --- AI Entities ---
 
   async loadAiEntities(gameId: string): Promise<AiEntityRecord[]> {
-    return readJsonl<AiEntityRecord>(this.path(`ai-entities-${gameId}.jsonl`));
+    return readJsonl<AiEntityRecord>(this.path(`${gameId}/entities.jsonl`));
   }
 
   async saveAiEntity(record: AiEntityRecord): Promise<void> {
-    appendJsonl(this.path(`ai-entities-${record.gameId}.jsonl`), record);
+    appendJsonl(this.path(`${record.gameId}/entities.jsonl`), record);
   }
 
   async getAiEntityIds(gameId: string): Promise<Set<string>> {
@@ -64,7 +64,7 @@ export class FileStorage implements RuntimeStorage {
   }
 
   async removeAiEntity(gameId: string, entityId: string): Promise<boolean> {
-    const filePath = this.path(`ai-entities-${gameId}.jsonl`);
+    const filePath = this.path(`${gameId}/entities.jsonl`);
     if (!existsSync(filePath)) return false;
     const lines = readFileSync(filePath, "utf-8").trim().split("\n");
     const filtered = lines.filter((line) => {
@@ -79,11 +79,11 @@ export class FileStorage implements RuntimeStorage {
   // --- AI Handlers ---
 
   async loadAiHandlers(gameId: string): Promise<AiHandlerRecord[]> {
-    return readJsonl<AiHandlerRecord>(this.path(`ai-handlers-${gameId}.jsonl`));
+    return readJsonl<AiHandlerRecord>(this.path(`${gameId}/handlers.jsonl`));
   }
 
   async saveHandler(record: AiHandlerRecord): Promise<void> {
-    appendJsonl(this.path(`ai-handlers-${record.gameId}.jsonl`), record);
+    appendJsonl(this.path(`${record.gameId}/handlers.jsonl`), record);
   }
 
   async listHandlers(gameId: string): Promise<AiHandlerRecord[]> {
@@ -91,7 +91,7 @@ export class FileStorage implements RuntimeStorage {
   }
 
   async removeHandler(gameId: string, name: string): Promise<boolean> {
-    const filePath = this.path(`ai-handlers-${gameId}.jsonl`);
+    const filePath = this.path(`${gameId}/handlers.jsonl`);
     if (!existsSync(filePath)) return false;
     const lines = readFileSync(filePath, "utf-8").trim().split("\n");
     const filtered = lines.filter((line) => {

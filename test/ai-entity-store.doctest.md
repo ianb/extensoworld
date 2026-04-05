@@ -15,7 +15,7 @@ function makeStore(): EntityStore {
 }
 
 const testGameId = "test-ai-entity";
-const testFile = resolve(process.cwd(), `data/ai-entities-${testGameId}.jsonl`);
+const testFile = resolve(process.cwd(), `data/${testGameId}/entities.jsonl`);
 function cleanup(): void {
   if (existsSync(testFile)) rmSync(testFile);
 }

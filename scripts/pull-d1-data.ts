@@ -137,7 +137,7 @@ function run(): void {
       }
       return rec;
     });
-    writeJsonl(resolve(outDir, `ai-entities-${gameId}.jsonl`), records);
+    writeJsonl(resolve(outDir, gameId, "entities.jsonl"), records);
   }
 
   console.log("Pulling AI handlers...");
@@ -165,7 +165,7 @@ function run(): void {
       }
       return rec;
     });
-    writeJsonl(resolve(outDir, `ai-handlers-${gameId}.jsonl`), records);
+    writeJsonl(resolve(outDir, gameId, "handlers.jsonl"), records);
   }
 
   console.log("Pulling conversation entries...");
@@ -199,7 +199,7 @@ function run(): void {
       }
       return rec;
     });
-    writeJsonl(resolve(outDir, "npc", gameId!, `${safeNpcId}.jsonl`), records);
+    writeJsonl(resolve(outDir, gameId!, "npc", `${safeNpcId}.jsonl`), records);
   }
 
   const totalEntities = entities.length;

@@ -288,8 +288,12 @@ const dataDir = resolve(ROOT, "data");
 if (existsSync(dataDir)) {
   const files = readdirSync(dataDir);
   for (const file of files) {
-    if (file.startsWith("ai-entities-") || file.startsWith("ai-handlers-")) {
-      wipeFile(join(dataDir, file));
+    const subDir = join(dataDir, file);
+    if (existsSync(join(subDir, "entities.jsonl"))) {
+      wipeFile(join(subDir, "entities.jsonl"));
+    }
+    if (existsSync(join(subDir, "handlers.jsonl"))) {
+      wipeFile(join(subDir, "handlers.jsonl"));
     }
   }
 }

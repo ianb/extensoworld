@@ -15,7 +15,7 @@ export type AiHandlerRecord = HandlerData & {
 };
 
 function handlerFilePath(gameId: string): string {
-  return resolve(process.cwd(), `data/ai-handlers-${gameId}.jsonl`);
+  return resolve(process.cwd(), `data/${gameId}/handlers.jsonl`);
 }
 
 function ensureDataDir(): void {

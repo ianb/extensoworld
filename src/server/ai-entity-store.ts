@@ -9,7 +9,7 @@ export type AiEntityRecord = EntityData & {
 };
 
 function entityFilePath(gameId: string): string {
-  return resolve(process.cwd(), `data/ai-entities-${gameId}.jsonl`);
+  return resolve(process.cwd(), `data/${gameId}/entities.jsonl`);
 }
 
 function ensureDataDir(): void {

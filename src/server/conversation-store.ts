@@ -13,7 +13,7 @@ export interface WordEntryRecord extends WordEntry {
 /** Get the JSONL file path for an NPC's conversation data */
 function npcFilePath(gameId: string, npcId: string): string {
   const safeId = npcId.replace(/:/g, "_");
-  return resolve(process.cwd(), `data/npc/${gameId}/${safeId}.jsonl`);
+  return resolve(process.cwd(), `data/${gameId}/npc/${safeId}.jsonl`);
 }
 
 function ensureDir(filePath: string): void {
