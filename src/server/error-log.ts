@@ -1,4 +1,5 @@
 import { getStorage } from "./storage-instance.js";
+import { BUILD_COMMIT } from "../../generated/build-version.js";
 
 export interface ErrorLogEntry {
   source: string;
@@ -31,11 +32,12 @@ export async function logErrorObj(
   opts: { error: unknown; userId?: string; gameId?: string; context?: string },
 ): Promise<void> {
   const err = opts.error instanceof Error ? opts.error : new Error(String(opts.error));
+  const context = opts.context ? `${opts.context} [${BUILD_COMMIT}]` : `[${BUILD_COMMIT}]`;
   await logError({
     source,
     message: err.message,
     stack: err.stack,
-    context: opts.context,
+    context,
     userId: opts.userId,
     gameId: opts.gameId,
   });

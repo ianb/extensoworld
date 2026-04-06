@@ -82,6 +82,7 @@ function AdminPage() {
   const isAdmin = auth.user && auth.user.roles && auth.user.roles.includes("admin");
   const [rows, setRows] = useState<UserRow[]>([]);
   const [games, setGames] = useState<GameLink[]>([]);
+  const [buildInfo, setBuildInfo] = useState<{ commit: string; time: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -95,6 +96,8 @@ function AdminPage() {
         });
         setRows(assembled);
         setGames(gameList as GameLink[]);
+        const d = data as { buildCommit?: string; buildTime?: string };
+        if (d.buildCommit) setBuildInfo({ commit: d.buildCommit, time: d.buildTime || "" });
         setLoading(false);
       })
       .catch((err: unknown) => {
@@ -113,6 +116,11 @@ function AdminPage() {
   return (
     <div className="mx-auto max-w-5xl p-8">
       <h1 className="mb-6 text-2xl font-bold">Admin Dashboard</h1>
+      {buildInfo ? (
+        <div className="mb-4 text-xs text-content/40">
+          Build: <code>{buildInfo.commit}</code> ({new Date(buildInfo.time).toLocaleString()})
+        </div>
+      ) : null}
       <div className="mb-6">
         <span className="text-sm font-bold text-content/60">Manage Images:</span>{" "}
         {games.map((g, i) => (

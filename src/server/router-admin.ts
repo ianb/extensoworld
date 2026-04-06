@@ -5,6 +5,7 @@ import { getStorage } from "./storage-instance.js";
 import { getImageStorage } from "./image-storage-instance.js";
 import { generateImage } from "./image-gen.js";
 import { getGame } from "../games/registry.js";
+import { BUILD_COMMIT, BUILD_TIME } from "../../generated/build-version.js";
 
 const adminProcedure = authedProcedure.use(async ({ ctx, next }) => {
   if (!ctx.roles.includes("admin")) {
@@ -19,7 +20,7 @@ export const adminRouter = router({
     const users = storage.listUsers ? await storage.listUsers() : [];
     const sessions = storage.listUserSessions ? await storage.listUserSessions() : [];
     const aiUsage = storage.listAiUsageByUser ? await storage.listAiUsageByUser() : [];
-    return { users, sessions, aiUsage };
+    return { users, sessions, aiUsage, buildCommit: BUILD_COMMIT, buildTime: BUILD_TIME };
   }),
 
   adminImageSettings: adminProcedure

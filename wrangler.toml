@@ -5,7 +5,7 @@ compatibility_flags = ["nodejs_compat"]
 upload_source_maps = true
 
 [build]
-command = "npx tsx scripts/bundle-game-data.ts && npm run build"
+command = "npx tsx scripts/bundle-game-data.ts && npx tsx scripts/stamp-version.ts && npm run build"
 
 [assets]
 directory = "dist"
