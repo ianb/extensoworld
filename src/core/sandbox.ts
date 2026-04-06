@@ -19,6 +19,40 @@ const BLOCKED_GLOBALS: Record<string, undefined> = {
 };
 
 /**
+ * Flatten prototype methods onto class instances so sval can see them.
+ * sval's sandbox doesn't preserve prototype chains, so inherited methods
+ * like lib.tryGet() would be invisible without this.
+ */
+function flattenForSandbox(variables: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(variables)) {
+    if (value !== null && typeof value === "object" && value.constructor !== Object) {
+      const flat: Record<string, unknown> = {};
+      // Walk the prototype chain to collect all methods
+      let proto = Object.getPrototypeOf(value) as Record<string, unknown> | null;
+      while (proto && proto !== Object.prototype) {
+        for (const name of Object.getOwnPropertyNames(proto)) {
+          if (name === "constructor") continue;
+          const desc = Object.getOwnPropertyDescriptor(proto, name);
+          if (desc && typeof desc.value === "function") {
+            flat[name] = (desc.value as (...args: unknown[]) => unknown).bind(value);
+          }
+        }
+        proto = Object.getPrototypeOf(proto) as Record<string, unknown> | null;
+      }
+      // Own properties override prototype methods
+      for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+        flat[k] = v;
+      }
+      result[key] = flat;
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+/**
  * Run a code string in a sandboxed SVal interpreter.
  *
  * The code is wrapped in a function body (so `return` works) and
@@ -31,7 +65,7 @@ export function runSandboxed(code: string, variables: Record<string, unknown>): 
     sourceType: "script",
     sandBox: true,
   });
-  interpreter.import({ ...BLOCKED_GLOBALS, ...variables });
+  interpreter.import({ ...BLOCKED_GLOBALS, ...flattenForSandbox(variables) });
   interpreter.run("exports.result = (function() { " + code + " })();");
   return interpreter.exports.result;
 }
@@ -50,7 +84,7 @@ export function buildSandboxedFunction(
       sourceType: "script",
       sandBox: true,
     });
-    interpreter.import({ ...BLOCKED_GLOBALS, ...variables });
+    interpreter.import({ ...BLOCKED_GLOBALS, ...flattenForSandbox(variables) });
     interpreter.run(wrappedCode);
     return interpreter.exports.result;
   };
