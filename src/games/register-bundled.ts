@@ -8,7 +8,14 @@ import { registerGame } from "./registry.js";
 import { bundledGames } from "../../generated/bundled-data.js";
 import { createCaveLib, ColossalCaveLib } from "./colossal-cave/cave-lib.js";
 
-/** Game-specific lib factories, keyed by slug */
+/**
+ * Game-specific lib factories, keyed by slug.
+ *
+ * IMPORTANT: Any game that uses a custom HandlerLib subclass in its
+ * index.ts MUST be registered here too, otherwise the Worker build
+ * will use the base HandlerLib and game-specific handler methods
+ * (like tryGet, get, has) will be missing at runtime.
+ */
 const gameOptions: Record<string, LoadGameOptions> = {
   "colossal-cave": { libFactory: createCaveLib, libClass: ColossalCaveLib },
 };
