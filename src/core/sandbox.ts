@@ -46,6 +46,12 @@ function prepareVars(variables: Record<string, unknown>): Record<string, unknown
       }
       // Own enumerable properties override prototype methods
       Object.assign(wrapper, value);
+      const methodCount = Object.keys(wrapper).filter(
+        (k) => typeof wrapper[k] === "function",
+      ).length;
+      if (methodCount === 0) {
+        console.warn(`[sandbox] prepareVars: ${key} has no methods after flattening`);
+      }
       prepared[key] = wrapper;
     } else {
       prepared[key] = value;
