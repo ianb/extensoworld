@@ -2,13 +2,7 @@ import type { Entity } from "../../core/entity.js";
 import type { VerbContext, WorldEvent } from "../../core/verb-types.js";
 import { HandlerLib } from "../../core/handler-lib.js";
 import type { LibDoc } from "../../core/handler-lib.js";
-
-class LibArgError extends Error {
-  override name = "LibArgError";
-  constructor(message: string) {
-    super(message);
-  }
-}
+import { requireString, requireOpts } from "../../core/handler-lib-guards.js";
 
 /**
  * Extended handler library for Colossal Cave Adventure.
@@ -118,8 +112,7 @@ export class ColossalCaveLib extends HandlerLib {
 
   /** Get an entity by ID (throws if not found) */
   get(id: string): Entity {
-    // eslint-disable-next-line error/no-literal-error-message
-    if (typeof id !== "string") throw new LibArgError("lib.get() expects a string entity ID");
+    requireString(id, "lib.get() id");
     return this.store.get(id);
   }
 
@@ -154,19 +147,16 @@ export class ColossalCaveLib extends HandlerLib {
     entityId: string,
     opts: { property: string; value: unknown; description: string },
   ): WorldEvent {
-    if (typeof entityId !== "string" || !opts || typeof opts.property !== "string") {
-      // eslint-disable-next-line error/no-literal-error-message
-      throw new LibArgError("lib.setProp() expects (entityId, {property, value, description})");
-    }
+    requireString(entityId, "lib.setProp() entityId");
+    requireOpts(opts, "lib.setProp()");
     return this.setEvent(entityId, opts);
   }
 
   /** Create a move-to-location event (simplified — no `from` required) */
   moveTo(entityId: string, opts: { to: string; description: string }): WorldEvent {
-    if (typeof entityId !== "string" || !opts || typeof opts.to !== "string") {
-      // eslint-disable-next-line error/no-literal-error-message
-      throw new LibArgError("lib.moveTo() expects (entityId, {to, description})");
-    }
+    requireString(entityId, "lib.moveTo() entityId");
+    const o = requireOpts(opts, "lib.moveTo()");
+    requireString(o.to, "lib.moveTo() to");
     return {
       type: "set-property",
       entityId,
@@ -180,10 +170,8 @@ export class ColossalCaveLib extends HandlerLib {
 
   /** Teleport the player between two rooms. Returns events array. */
   teleport(from: string, to: string): WorldEvent[] {
-    if (typeof from !== "string" || typeof to !== "string") {
-      // eslint-disable-next-line error/no-literal-error-message
-      throw new LibArgError("lib.teleport() expects (fromRoomId, toRoomId)");
-    }
+    requireString(from, "lib.teleport() from");
+    requireString(to, "lib.teleport() to");
     return [
       {
         type: "set-property",
@@ -234,10 +222,8 @@ export class ColossalCaveLib extends HandlerLib {
 
   /** Set a property on an entity immediately (not event-based) */
   setProperty(id: string, opts: { name: string; value: unknown }): void {
-    if (typeof id !== "string" || !opts || typeof opts.name !== "string") {
-      // eslint-disable-next-line error/no-literal-error-message
-      throw new LibArgError("lib.setProperty() expects (entityId, {name, value})");
-    }
+    requireString(id, "lib.setProperty() entityId");
+    requireOpts(opts, "lib.setProperty()");
     this.store.setProperty(id, opts);
   }
 

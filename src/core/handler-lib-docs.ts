@@ -34,3 +34,14 @@ export const BASE_LIB_DOCS: LibDoc[] = [
   { name: "showScore", signature: "showScore()", description: "current score display → PerformResult" },
   { name: "incrementVisits", signature: "incrementVisits()", description: "bump room visit counter → PerformResult" },
 ];
+
+export const HELP_TEXT = [
+  "Commands:",
+  "  look/l — Look around    examine/x <thing> — Examine",
+  "  go <dir> (or n/s/e/w)   take/get <thing> — Pick up",
+  "  drop <thing>            put <thing> in <container>",
+  "  open/close <thing>      inventory/i — Check carrying",
+  "  talk/use <thing> — Talk to NPC/device    score",
+  "",
+  'Type "help ai" for world-editing commands.',
+].join("\n");

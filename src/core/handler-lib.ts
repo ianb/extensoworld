@@ -3,7 +3,9 @@ import type { VerbContext, PerformResult, WorldEvent } from "./verb-types.js";
 import { entityRef, itemDisplay, describeRoomFull } from "./describe.js";
 import { isRoomLit, darknessDescription } from "./darkness.js";
 import { renderTemplate } from "./templates.js";
-import { BASE_LIB_DOCS } from "./handler-lib-docs.js";
+import { BASE_LIB_DOCS, HELP_TEXT } from "./handler-lib-docs.js";
+import { requireString, requireEntity, requireOpts } from "./handler-lib-guards.js";
+import * as actions from "./handler-lib-actions.js";
 
 export type { LibDoc } from "./handler-lib-docs.js";
 
@@ -29,48 +31,54 @@ export class HandlerLib {
   }
 
   ref(entity: Entity): string {
+    requireEntity(entity, "lib.ref() entity");
     return entityRef(entity);
   }
 
   setEvent(
     entityId: string,
-    { property, value, description }: { property: string; value: unknown; description: string },
+    opts: { property: string; value: unknown; description: string },
   ): WorldEvent {
-    return { type: "set-property", entityId, property, value, description };
+    requireString(entityId, "lib.setEvent() entityId");
+    const o = requireOpts(opts, "lib.setEvent()");
+    return {
+      type: "set-property",
+      entityId,
+      property: (o.property as string) || "",
+      value: o.value,
+      description: (o.description as string) || "",
+    };
   }
 
-  moveEvent(
-    entityId: string,
-    { to, from, description }: { to: string; from: string; description: string },
-  ): WorldEvent {
+  moveEvent(entityId: string, opts: { to: string; from: string; description: string }): WorldEvent {
+    requireString(entityId, "lib.moveEvent() entityId");
+    const o = requireOpts(opts, "lib.moveEvent()");
     return {
       type: "set-property",
       entityId,
       property: "location",
-      value: to,
-      oldValue: from,
-      description,
+      value: requireString(o.to, "lib.moveEvent() to"),
+      oldValue: o.from as string,
+      description: (o.description as string) || "",
     };
   }
 
   createEvent(
     entityId: string,
-    {
-      tags,
-      properties,
-      description,
-    }: { tags: string[]; properties: Record<string, unknown>; description: string },
+    opts: { tags: string[]; properties: Record<string, unknown>; description: string },
   ): WorldEvent {
+    requireString(entityId, "lib.createEvent() entityId");
+    const o = requireOpts(opts, "lib.createEvent()");
     return {
       type: "create-entity",
       entityId,
-      value: { tags, properties },
-      description,
+      value: { tags: o.tags, properties: o.properties },
+      description: (o.description as string) || "",
     };
   }
 
   result(output: string): PerformResult {
-    return { output, events: [] };
+    return { output: typeof output === "string" ? output : String(output), events: [] };
   }
 
   carried(): Entity[] {
@@ -78,10 +86,12 @@ export class HandlerLib {
   }
 
   contents(entityId: string): Entity[] {
+    if (typeof entityId !== "string" || !this.store.has(entityId)) return [];
     return this.store.getContents(entityId);
   }
 
   findKey(obj: Entity): Entity | null {
+    if (!obj || typeof obj !== "object") return null;
     const keyId = obj.properties.unlockedBy;
     if (!keyId) return null;
     const key = this.store.tryGet(keyId);
@@ -108,6 +118,7 @@ export class HandlerLib {
   }
 
   examine(target: Entity): PerformResult {
+    requireEntity(target, "lib.examine() target");
     const rawDesc = target.description || `You see nothing special about the ${this.ref(target)}.`;
     const desc = renderTemplate(rawDesc, { entity: target, store: this.store });
     const parts = [desc];
@@ -123,6 +134,7 @@ export class HandlerLib {
   }
 
   take(obj: Entity): PerformResult {
+    requireEntity(obj, "lib.take() object");
     const ref = this.ref(obj);
     return {
       output: `You take the ${ref}.`,
@@ -137,6 +149,7 @@ export class HandlerLib {
   }
 
   drop(obj: Entity): PerformResult {
+    requireEntity(obj, "lib.drop() object");
     const ref = this.ref(obj);
     const events: WorldEvent[] = [];
     if (obj.properties.worn) {
@@ -162,6 +175,7 @@ export class HandlerLib {
   }
 
   open(obj: Entity): PerformResult {
+    requireEntity(obj, "lib.open() object");
     const ref = this.ref(obj);
     const events: WorldEvent[] = [
       this.setEvent(obj.id, { property: "open", value: true, description: `Opened ${ref}` }),
@@ -177,142 +191,72 @@ export class HandlerLib {
   }
 
   close(obj: Entity): PerformResult {
+    requireEntity(obj, "lib.close() object");
     const ref = this.ref(obj);
-    const ev = this.setEvent(obj.id, {
-      property: "open",
-      value: false,
-      description: `Closed ${ref}`,
-    });
-    return { output: `You close the ${ref}.`, events: [ev] };
+    return {
+      output: `You close the ${ref}.`,
+      events: [
+        this.setEvent(obj.id, { property: "open", value: false, description: `Closed ${ref}` }),
+      ],
+    };
   }
 
   putIn(obj: Entity, container: Entity): PerformResult {
+    requireEntity(obj, "lib.putIn() object");
+    requireEntity(container, "lib.putIn() container");
     const objRef = this.ref(obj);
     const indRef = this.ref(container);
-    const ev = this.moveEvent(obj.id, {
-      to: container.id,
-      from: this.player.id,
-      description: `Put ${objRef} in ${indRef}`,
-    });
-    return { output: `You put the ${objRef} in the ${indRef}.`, events: [ev] };
+    return {
+      output: `You put the ${objRef} in the ${indRef}.`,
+      events: [
+        this.moveEvent(obj.id, {
+          to: container.id,
+          from: this.player.id,
+          description: `Put ${objRef} in ${indRef}`,
+        }),
+      ],
+    };
   }
 
   takeFrom(obj: Entity, container: Entity): PerformResult {
+    requireEntity(obj, "lib.takeFrom() object");
+    requireEntity(container, "lib.takeFrom() container");
     const objRef = this.ref(obj);
     const indRef = this.ref(container);
-    const ev = this.moveEvent(obj.id, {
-      to: this.player.id,
-      from: container.id,
-      description: `Took ${objRef} from ${indRef}`,
-    });
-    return { output: `You take the ${objRef} from the ${indRef}.`, events: [ev] };
+    return {
+      output: `You take the ${objRef} from the ${indRef}.`,
+      events: [
+        this.moveEvent(obj.id, {
+          to: this.player.id,
+          from: container.id,
+          description: `Took ${objRef} from ${indRef}`,
+        }),
+      ],
+    };
   }
 
   unlockWith(obj: Entity, key: Entity): PerformResult {
-    const ref = this.ref(obj);
-    const events: WorldEvent[] = [
-      this.setEvent(obj.id, { property: "locked", value: false, description: `Unlocked ${ref}` }),
-    ];
-    const pairedId = obj.properties.pairedDoor;
-    if (pairedId) {
-      events.push(
-        this.setEvent(pairedId, {
-          property: "locked",
-          value: false,
-          description: "Unlocked paired door",
-        }),
-      );
-    }
-    return { output: `You unlock the ${ref} with the ${this.ref(key)}.`, events };
+    return actions.unlockWith(this, { obj, key });
   }
-
   unlock(obj: Entity): PerformResult {
-    const key = this.findKey(obj);
-    if (!key)
-      return this.result(`{!You don't have anything to unlock the ${this.ref(obj)} with.!}`);
-    return this.unlockWith(obj, key);
+    return actions.unlock(this, obj);
   }
-
   lock(obj: Entity): PerformResult {
-    const key = this.findKey(obj);
-    if (!key) return this.result(`{!You don't have anything to lock the ${this.ref(obj)} with.!}`);
-    const ev = this.setEvent(obj.id, {
-      property: "locked",
-      value: true,
-      description: `Locked ${this.ref(obj)}`,
-    });
-    return { output: `You lock the ${this.ref(obj)} with the ${this.ref(key)}.`, events: [ev] };
+    return actions.lock(this, obj);
   }
-
   switchOn(obj: Entity): PerformResult {
-    const ref = this.ref(obj);
-    return {
-      output: `You turn on the ${ref}.`,
-      events: [
-        this.setEvent(obj.id, {
-          property: "switchedOn",
-          value: true,
-          description: `Turned on ${ref}`,
-        }),
-        this.setEvent(obj.id, {
-          property: "lit",
-          value: true,
-          description: `${ref} now provides light`,
-        }),
-      ],
-    };
+    return actions.switchOn(this, obj);
   }
-
   switchOff(obj: Entity): PerformResult {
-    const ref = this.ref(obj);
-    return {
-      output: `You turn off the ${ref}.`,
-      events: [
-        this.setEvent(obj.id, {
-          property: "switchedOn",
-          value: false,
-          description: `Turned off ${ref}`,
-        }),
-        this.setEvent(obj.id, {
-          property: "lit",
-          value: false,
-          description: `${ref} no longer provides light`,
-        }),
-      ],
-    };
+    return actions.switchOff(this, obj);
   }
-
   wear(obj: Entity): PerformResult {
-    const ref = this.ref(obj);
-    const events: WorldEvent[] = [
-      this.setEvent(obj.id, { property: "worn", value: true, description: `Now wearing ${ref}` }),
-    ];
-    if (obj.location !== this.player.id) {
-      events.unshift(
-        this.moveEvent(obj.id, {
-          to: this.player.id,
-          from: obj.location,
-          description: `Picked up ${ref}`,
-        }),
-      );
-    }
-    return { output: `You put on the ${ref}.`, events };
+    return actions.wear(this, obj);
   }
 
   showHelp(): PerformResult {
-    const lines = [
-      "Commands:",
-      "  look/l — Look around    examine/x <thing> — Examine",
-      "  go <dir> (or n/s/e/w)   take/get <thing> — Pick up",
-      "  drop <thing>            put <thing> in <container>",
-      "  open/close <thing>      inventory/i — Check carrying",
-      "  talk/use <thing> — Talk to NPC/device    score",
-      "",
-      'Type "help ai" for world-editing commands.',
-    ];
-    return { output: lines.join("\n"), events: [] };
+    return { output: HELP_TEXT, events: [] };
   }
-
   showScore(): PerformResult {
     const s = this.player.properties.score || 0;
     const max = this.player.properties.maxScore || 0;
@@ -321,14 +265,13 @@ export class HandlerLib {
       events: [],
     };
   }
-
   incrementVisits(): PerformResult {
     const visits = (this.room.room && this.room.room.visits) || 0;
-    const ev = this.setEvent(this.room.id, {
-      property: "visits",
-      value: visits + 1,
-      description: "",
-    });
-    return { output: "", events: [ev] };
+    return {
+      output: "",
+      events: [
+        this.setEvent(this.room.id, { property: "visits", value: visits + 1, description: "" }),
+      ],
+    };
   }
 }
