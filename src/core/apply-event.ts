@@ -9,8 +9,10 @@ export function applySingleEvent(store: EntityStore, event: WorldEvent): void {
       store.create(event.entityId, data);
     }
   } else if (event.type === "set-property" && event.property) {
+    if (!store.has(event.entityId)) return;
     store.setProperty(event.entityId, { name: event.property, value: event.value });
   } else if (event.type === "remove-property" && event.property) {
+    if (!store.has(event.entityId)) return;
     store.removeProperty(event.entityId, event.property);
   }
 }
