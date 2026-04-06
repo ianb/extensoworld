@@ -163,8 +163,8 @@ function connectorRect(
     return {
       left: minLeft + ROOM_W + GAP,
       top: minTop + ROOM_H + GAP,
-      width: maxLeft - minLeft - ROOM_W - GAP * 2,
-      height: maxTop - minTop - ROOM_H - GAP * 2,
+      width: Math.max(1, maxLeft - minLeft - ROOM_W - GAP * 2),
+      height: Math.max(1, maxTop - minTop - ROOM_H - GAP * 2),
     };
   }
 
