@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
 
 const HIGHLIGHT_PATTERN =
@@ -214,17 +214,11 @@ function EntityImage({
           ) : null}
         </div>
         {lightbox ? (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
-            onClick={() => setLightbox(false)}
-          >
-            <img
-              src={imgSrc}
-              alt={imageAlt ? `[image: ${imageAlt}]` : entityName}
-              className="max-h-[90vh] max-w-[90vw] rounded shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            />
-          </div>
+          <Lightbox
+            src={imgSrc}
+            alt={imageAlt ? `[image: ${imageAlt}]` : entityName}
+            onClose={() => setLightbox(false)}
+          />
         ) : null}
       </>
     );
@@ -251,4 +245,28 @@ function EntityImage({
   }
 
   return null;
+}
+
+function Lightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+      onClick={onClose}
+    >
+      <img
+        src={src}
+        alt={alt}
+        className="max-h-[90vh] max-w-[90vw] rounded shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>
+  );
 }
