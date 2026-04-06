@@ -35,9 +35,35 @@ export async function handleAiDestroyCommand(
   }
   const entity = store.get(match);
   const entityName = entity.name || match;
-  store.delete(match);
-  await storage.removeAiEntity(gameId, match);
-  return { output: `[Destroyed ${entityName} (${match})]` };
+  const destroyed: string[] = [match];
+
+  // If destroying a room, also clean up related exits
+  if (entity.tags.includes("room")) {
+    // Remove exits inside this room
+    const contents = store.getContents(match);
+    for (const child of contents) {
+      if (child.tags.includes("exit")) {
+        destroyed.push(child.id);
+      }
+    }
+    // Revert exits in other rooms that point to this room back to unresolved
+    const allExits = store.findByTag("exit");
+    for (const exit of allExits) {
+      if (exit.exit && exit.exit.destination === match) {
+        const intent = exit.exit.destinationIntent || entityName;
+        exit.exit.destination = undefined;
+        exit.exit.destinationIntent = intent;
+      }
+    }
+  }
+
+  for (const id of destroyed) {
+    if (store.has(id)) store.delete(id);
+    await storage.removeAiEntity(gameId, id);
+  }
+
+  const extra = destroyed.length > 1 ? ` and ${destroyed.length - 1} related exit(s)` : "";
+  return { output: `[Destroyed ${entityName} (${match})${extra}]` };
 }
 
 export async function handleAiDestroyVerbCommand({
