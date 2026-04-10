@@ -22,10 +22,16 @@ interface CommandResult {
   bugPreview?: BugPreviewData;
 }
 
+export interface AgentProgressPayload {
+  turn: number;
+  toolCalls: Array<{ name: string; summary: string }>;
+}
+
 interface StreamEvent {
-  phase: "ai" | "done" | "error";
+  phase: "ai" | "agent-progress" | "done" | "error";
   result?: CommandResult;
   error?: string;
+  progress?: AgentProgressPayload;
 }
 
 interface StreamCommandOptions {
@@ -33,6 +39,7 @@ interface StreamCommandOptions {
   text: string;
   debug: boolean;
   onPhase: (phase: string) => void;
+  onAgentProgress?: (progress: AgentProgressPayload) => void;
 }
 
 class CommandHttpError extends Error {
@@ -62,7 +69,7 @@ class CommandServerError extends Error {
  * Returns the final result.
  */
 export async function streamCommand(options: StreamCommandOptions): Promise<CommandResult> {
-  const { gameId, text, debug, onPhase } = options;
+  const { gameId, text, debug, onPhase, onAgentProgress } = options;
 
   const response = await fetch("/api/command", {
     method: "POST",
@@ -95,6 +102,8 @@ export async function streamCommand(options: StreamCommandOptions): Promise<Comm
 
       if (event.phase === "ai") {
         onPhase("ai");
+      } else if (event.phase === "agent-progress" && event.progress) {
+        if (onAgentProgress) onAgentProgress(event.progress);
       } else if (event.phase === "done" && event.result) {
         finalResult = event.result;
       } else if (event.phase === "error") {

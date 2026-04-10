@@ -34,6 +34,10 @@ interface ExecuteOptions {
   game: GameInstance;
   reinitGame: (session: SessionKey) => Promise<GameInstance>;
   onAiStart?: () => void;
+  onAgentProgress?: (progress: {
+    turn: number;
+    toolCalls: Array<{ name: string; summary: string }>;
+  }) => void;
 }
 
 async function trySceneryFallback(
@@ -90,9 +94,31 @@ function parseBugCommand(text: string): string | null {
   return match ? match[1]! : null;
 }
 
+async function tryConversationMode(
+  game: GameInstance,
+  {
+    trimmed,
+    session,
+    authoring,
+  }: { trimmed: string; session: SessionKey; authoring: AuthoringInfo },
+): Promise<CommandResult | null> {
+  if (!game.conversationState) return null;
+  const convAuthoring = { ...authoring, creationSource: "conversation" };
+  const convResult = await handleConversationWord(game, {
+    word: trimmed,
+    session,
+    authoring: convAuthoring,
+  });
+  return {
+    output: convResult.output,
+    conversationMode: convResult.conversationMode,
+    debug: undefined,
+  };
+}
+
 export async function executeCommand(
   input: CommandInput,
-  { game, reinitGame, onAiStart }: ExecuteOptions,
+  { game, reinitGame, onAiStart, onAgentProgress }: ExecuteOptions,
 ): Promise<CommandResult> {
   const trimmed = input.text.trim();
   const session: SessionKey = { gameId: input.gameId, userId: input.userId };
@@ -123,20 +149,8 @@ export async function executeCommand(
     }
   }
 
-  // Conversation mode: route single-word input to conversation engine
-  if (game.conversationState) {
-    const convAuthoring = { ...authoring, creationSource: "conversation" };
-    const convResult = await handleConversationWord(game, {
-      word: trimmed,
-      session,
-      authoring: convAuthoring,
-    });
-    return {
-      output: convResult.output,
-      conversationMode: convResult.conversationMode,
-      debug: undefined,
-    };
-  }
+  const convResult = await tryConversationMode(game, { trimmed, session, authoring });
+  if (convResult) return convResult;
 
   // Bug reporting: "bug <description>"
   const bugDescription = parseBugCommand(trimmed);
@@ -149,7 +163,13 @@ export async function executeCommand(
     return { output: "", bugPreview: preview };
   }
 
-  const special = handleSpecialCommand(trimmed, { game, session, opts, reinitGame });
+  const special = handleSpecialCommand(trimmed, {
+    game,
+    session,
+    opts,
+    reinitGame,
+    onAgentProgress,
+  });
   if (special) return await special;
 
   // Extract [bracketed instructions] for AI guidance

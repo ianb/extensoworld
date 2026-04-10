@@ -1,0 +1,25 @@
+import type { EntityStore } from "../core/entity.js";
+import type { VerbRegistry } from "../core/verbs.js";
+import type { RuntimeStorage, WorldEditRecord } from "./storage.js";
+
+/**
+ * Mutable per-tick context shared by all agent tools. The factory in
+ * agent-tools.ts captures this once and the tools mutate it as the agent
+ * works.
+ *
+ * - `store` and `verbs` reflect (live ⊕ pending session edits) and the tools
+ *   apply each newly-emitted edit to them so subsequent reads see it.
+ * - `pendingEdits` is the in-memory copy of all edits this tick has
+ *   appended to the log; used by query tools that want a self-only view.
+ * - `terminate` is set by finish() / bail() to signal the loop to stop.
+ */
+export interface ToolContext {
+  storage: RuntimeStorage;
+  gameId: string;
+  sessionId: string;
+  store: EntityStore;
+  verbs: VerbRegistry;
+  pendingEdits: WorldEditRecord[];
+  savedVars: Record<string, unknown>;
+  terminate: { kind: "finish" | "bail"; summary: string } | null;
+}

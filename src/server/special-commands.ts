@@ -9,6 +9,7 @@ import {
   handleAiCreateCommand,
   handleAiDestroyCommand,
   handleAiDestroyVerbCommand,
+  handleAiAgentCommand,
 } from "./ai-commands.js";
 
 interface CommandOpts {
@@ -42,11 +43,16 @@ export function handleSpecialCommand(
     session,
     opts,
     reinitGame,
+    onAgentProgress,
   }: {
     game: GameInstance;
     session: SessionKey;
     opts: CommandOpts;
     reinitGame?: (session: SessionKey) => Promise<GameInstance>;
+    onAgentProgress?: (progress: {
+      turn: number;
+      toolCalls: Array<{ name: string; summary: string }>;
+    }) => void;
   },
 ): CommandReturn | null {
   if (trimmed === "/undo" && reinitGame) {
@@ -76,6 +82,7 @@ export function handleSpecialCommand(
         "  ai create exit <description> — Create a new exit from the current room",
         "  ai destroy <object>          — Remove an AI-created object",
         "  ai destroy verb <search>     — Find and remove an AI-created verb handler",
+        "  ai agent <instructions>      — Run an autonomous agent to make coordinated changes",
         "",
         "System:",
         "  /undo  — Undo the last action",
@@ -87,6 +94,19 @@ export function handleSpecialCommand(
 
   if (trimmed.startsWith("ai ") && !opts.hasAiRole) {
     return { output: "You don't have permission to use AI commands.", debug: undefined };
+  }
+
+  if (trimmed.startsWith("ai agent ")) {
+    const instructions = trimmed.slice("ai agent ".length).trim();
+    if (!instructions) return { output: "Usage: ai agent <instructions>", debug: undefined };
+    const a = { ...opts.authoring, creationSource: "agent" };
+    return handleAiAgentCommand({
+      instructions,
+      gameId: opts.gameId,
+      userId: opts.authoring.createdBy,
+      authoring: a,
+      onProgress: onAgentProgress,
+    });
   }
 
   if (trimmed.startsWith("ai create exit ")) {

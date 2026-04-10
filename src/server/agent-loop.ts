@@ -1,0 +1,245 @@
+import { generateText, stepCountIs, hasToolCall } from "ai";
+import type { LanguageModel, ModelMessage } from "ai";
+import { getLlm } from "./llm.js";
+import { getStorage } from "./storage-instance.js";
+import { getGame } from "../games/registry.js";
+import type { GameInstance } from "../games/registry.js";
+import { applyPendingEditsToWorld } from "./agent-world-view.js";
+import { applyAiEntityRecords } from "./apply-ai-records.js";
+import { recordToHandler } from "./handler-convert.js";
+import { buildAgentTools } from "./agent-tools.js";
+import { buildAgentSystemPrompt } from "./agent-system-prompt.js";
+import type { ToolContext } from "./agent-tool-context.js";
+import type { AgentSessionRecord, AgentSessionStatus } from "./storage.js";
+
+class GameNotFoundError extends Error {
+  override name = "GameNotFoundError";
+  constructor(slug: string) {
+    super(`Game not found: ${slug}`);
+  }
+}
+
+class SessionNotFoundError extends Error {
+  override name = "SessionNotFoundError";
+  constructor(id: string) {
+    super(`Agent session not found: ${id}`);
+  }
+}
+
+class SessionAlreadyTerminalError extends Error {
+  override name = "SessionAlreadyTerminalError";
+  constructor(id: string, status: AgentSessionStatus) {
+    super(`Agent session ${id} is already in terminal state: ${status}`);
+  }
+}
+
+export interface TickResult {
+  status: AgentSessionStatus;
+  turnsRun: number;
+  summary: string | null;
+}
+
+/**
+ * Per-step progress event emitted as the agent works. Useful for streaming
+ * status to the player UI so an `ai agent` command shows what the agent is
+ * actually doing instead of just hanging on a "...".
+ */
+export interface AgentProgressEvent {
+  turn: number;
+  toolCalls: Array<{ name: string; summary: string }>;
+}
+
+export type AgentProgressCallback = (event: AgentProgressEvent) => void;
+
+function summarizeToolCall(name: string, input: unknown): string {
+  if (input === null || typeof input !== "object") return name;
+  const obj = input as Record<string, unknown>;
+  if (name === "apply_edits") {
+    const edits = obj["edits"] as Array<Record<string, unknown>> | undefined;
+    if (!edits) return "apply_edits";
+    return `apply_edits (${edits.length} edits)`;
+  }
+  if (name === "query") {
+    return `query ${String(obj["kind"] || "")} ${String(obj["tag"] || obj["id"] || "")}`.trim();
+  }
+  if (name === "jq") {
+    return `jq ${String(obj["filter"] || "")}`;
+  }
+  if (name === "save_var") return `save_var ${String(obj["name"] || "")}`;
+  if (name === "get_var") return `get_var ${String(obj["name"] || "")}`;
+  if (name === "finish") return `finish: ${String(obj["summary"] || "")}`;
+  if (name === "bail") return `bail: ${String(obj["reason"] || "")}`;
+  return name;
+}
+
+/**
+ * Run a single tick of the agent loop. Loads the session, drives generateText
+ * with the agent tools, persists the resulting messages, and either commits
+ * (on finish), abandons (on bail), or leaves running for the next tick.
+ *
+ * In v1 we run the loop synchronously to terminal in one tick by default,
+ * since the user has agreed to start with synchronous execution. The
+ * `maxStepsPerTick` parameter caps how many tool-use steps a single tick
+ * will burn before yielding.
+ */
+export async function tickSession(
+  sessionId: string,
+  options?: {
+    model?: LanguageModel;
+    maxStepsPerTick?: number;
+    onProgress?: AgentProgressCallback;
+  },
+): Promise<TickResult> {
+  const storage = getStorage();
+  const session = await storage.getAgentSession(sessionId);
+  if (!session) throw new SessionNotFoundError(sessionId);
+  if (session.status !== "running") {
+    throw new SessionAlreadyTerminalError(sessionId, session.status);
+  }
+
+  const game = await loadAgentGame(session);
+
+  const context: ToolContext = {
+    storage,
+    gameId: session.gameId,
+    sessionId: session.id,
+    store: game.store,
+    verbs: game.verbs,
+    pendingEdits: await storage.getSessionEdits(sessionId),
+    savedVars: { ...session.savedVars },
+    terminate: null,
+  };
+
+  // Apply already-emitted pending edits to the agent's view (in case this is
+  // a resumed tick).
+  applyPendingEditsToWorld(context.pendingEdits, {
+    store: game.store,
+    verbs: game.verbs,
+    gameId: session.gameId,
+  });
+
+  const tools = buildAgentTools(context);
+  const systemPrompt = buildAgentSystemPrompt({
+    store: game.store,
+    prompts: game.prompts,
+  });
+
+  const messages: ModelMessage[] = (
+    session.messages.length > 0
+      ? (session.messages as ModelMessage[])
+      : [{ role: "user", content: session.request }]
+  ) as ModelMessage[];
+
+  const model = options && options.model ? options.model : getLlm();
+  const stepBudget = options && options.maxStepsPerTick ? options.maxStepsPerTick : 30;
+  const remainingTurns = session.turnLimit - session.turnCount;
+  const stepLimit = Math.min(stepBudget, Math.max(remainingTurns, 1));
+
+  let turnsRun = 0;
+  let lastResult;
+  const onProgress = options && options.onProgress;
+  let stepIndex = 0;
+
+  try {
+    lastResult = await generateText({
+      model,
+      system: systemPrompt,
+      messages,
+      tools,
+      stopWhen: [stepCountIs(stepLimit), hasToolCall("finish"), hasToolCall("bail")],
+      onStepFinish: (step) => {
+        stepIndex += 1;
+        const calls = step.toolCalls.map((call) => ({
+          name: call.toolName,
+          summary: summarizeToolCall(call.toolName, call.input),
+        }));
+        const turn = session.turnCount + stepIndex;
+        if (calls.length > 0) {
+          console.log(`[agent ${session.id} t${turn}] ${calls.map((c) => c.summary).join(" · ")}`);
+        }
+        if (onProgress) onProgress({ turn, toolCalls: calls });
+      },
+    });
+    turnsRun = lastResult.steps.length;
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    await storage.updateAgentSession(sessionId, {
+      status: "failed",
+      summary: `Loop error: ${message}`,
+      finishedAt: new Date().toISOString(),
+    });
+    return { status: "failed", turnsRun, summary: `Loop error: ${message}` };
+  }
+
+  // Append new response messages onto the persistent session messages.
+  const newMessages: unknown[] = [...messages, ...lastResult.response.messages];
+  const newTurnCount = session.turnCount + turnsRun;
+
+  if (context.terminate && context.terminate.kind === "finish") {
+    await storage.commitSession(sessionId, context.terminate.summary);
+    await storage.updateAgentSession(sessionId, {
+      messages: newMessages,
+      savedVars: context.savedVars,
+      turnCount: newTurnCount,
+    });
+    return {
+      status: "finished",
+      turnsRun,
+      summary: context.terminate.summary,
+    };
+  }
+
+  if (context.terminate && context.terminate.kind === "bail") {
+    await storage.updateAgentSession(sessionId, {
+      status: "bailed",
+      summary: context.terminate.summary,
+      messages: newMessages,
+      savedVars: context.savedVars,
+      turnCount: newTurnCount,
+      finishedAt: new Date().toISOString(),
+    });
+    return {
+      status: "bailed",
+      turnsRun,
+      summary: context.terminate.summary,
+    };
+  }
+
+  // Either we hit the step budget or the model decided not to call another tool.
+  // If we ran out of turns relative to turnLimit, mark as failed.
+  if (newTurnCount >= session.turnLimit) {
+    const summary = `Turn limit (${session.turnLimit}) reached without finish().`;
+    await storage.updateAgentSession(sessionId, {
+      status: "failed",
+      summary,
+      messages: newMessages,
+      savedVars: context.savedVars,
+      turnCount: newTurnCount,
+      finishedAt: new Date().toISOString(),
+    });
+    return { status: "failed", turnsRun, summary };
+  }
+
+  // Persist progress; status remains 'running' so a future tick can resume.
+  await storage.updateAgentSession(sessionId, {
+    messages: newMessages,
+    savedVars: context.savedVars,
+    turnCount: newTurnCount,
+  });
+  return { status: "running", turnsRun, summary: null };
+}
+
+async function loadAgentGame(session: AgentSessionRecord): Promise<GameInstance> {
+  const def = getGame(session.gameId);
+  if (!def) throw new GameNotFoundError(session.gameId);
+  const instance = def.create();
+  // Materialized AI entities/handlers from the live tables.
+  const storage = getStorage();
+  const aiEntities = await storage.loadAiEntities(session.gameId);
+  applyAiEntityRecords(aiEntities, instance.store);
+  const handlerRecords = await storage.loadAiHandlers(session.gameId);
+  for (const record of handlerRecords) {
+    instance.verbs.register(recordToHandler(record));
+  }
+  return instance;
+}

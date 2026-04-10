@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useContext, useCallback } from "react";
 import { trpc } from "./trpc.js";
 import { useStickyState } from "./use-sticky-state.js";
 import { streamCommand } from "./stream-command.js";
+import type { AgentProgressPayload } from "./stream-command.js";
 import { AuthContext } from "./auth.js";
 import { ThinkingIndicator } from "./ThinkingIndicator.js";
 import {
@@ -12,6 +13,17 @@ import {
   resultToLogEntries,
 } from "./shell-components.js";
 import type { LogEntry } from "./shell-components.js";
+
+interface ConversationModeState {
+  npcName: string;
+  knownWords: string[];
+}
+
+function agentProgressEntry(progress: AgentProgressPayload): LogEntry | null {
+  const summaries = progress.toolCalls.map((c) => c.summary).join(" · ");
+  if (!summaries) return null;
+  return { type: "system", text: `[agent t${progress.turn}] ${summaries}` };
+}
 
 interface ImageCallbacks {
   setGenerating: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
@@ -107,10 +119,7 @@ export function WorldShell({
   const canDebug = roles.includes("debug");
   const isAdmin = roles.includes("admin");
   const [debugMode, setDebugMode] = useStickyState("extenso:debugMode", false);
-  const [conversationMode, setConversationMode] = useState<{
-    npcName: string;
-    knownWords: string[];
-  } | null>(null);
+  const [conversationMode, setConversationMode] = useState<ConversationModeState | null>(null);
   const [imageStatus, setImageStatus] = useState<Record<string, boolean>>({});
   const [imagePrompts, setImagePrompts] = useState<Record<string, string>>({});
   const [generatingImages, setGeneratingImages] = useState<Record<string, boolean>>({});
@@ -147,20 +156,21 @@ export function WorldShell({
       setLoading(true);
       setLoadingPhase("thinking");
       setLog((prev) => [...prev, { type: "input", text: `> ${command}` }]);
+      const onAgentProgress = (progress: AgentProgressPayload) => {
+        const entry = agentProgressEntry(progress);
+        if (entry) setLog((prev) => [...prev, entry]);
+      };
       try {
         const result = await streamCommand({
           gameId,
           text: command,
           debug: debugMode,
-          onPhase(phase) {
-            if (phase === "ai") setLoadingPhase("ai");
-          },
+          onPhase: (phase) => phase === "ai" && setLoadingPhase("ai"),
+          onAgentProgress,
         });
         setLog((prev) => [...prev, ...resultToLogEntries(result)]);
         if ("conversationMode" in result) {
-          setConversationMode(
-            (result.conversationMode as { npcName: string; knownWords: string[] } | null) || null,
-          );
+          setConversationMode((result.conversationMode as ConversationModeState | null) || null);
         }
         refreshImageStatus(result.output);
         if (onCommandComplete) onCommandComplete();

@@ -44,6 +44,54 @@ export interface SessionKey {
   userId: string;
 }
 
+// --- Agent sessions and world edits ---
+
+export type AgentSessionStatus = "running" | "finished" | "bailed" | "failed";
+
+/** Persistent state for one run of the agentic world editor */
+export interface AgentSessionRecord {
+  id: string;
+  gameId: string;
+  userId: string;
+  request: string;
+  status: AgentSessionStatus;
+  /** Full Claude messages array (assistant/user/tool messages with tool_use/tool_result blocks) */
+  messages: unknown[];
+  /** Session-scoped scratchpad: results from save_var */
+  savedVars: Record<string, unknown>;
+  turnCount: number;
+  turnLimit: number;
+  /** Populated by finish() */
+  summary: string | null;
+  /** If this session reverts another, the original session id */
+  revertOf: string | null;
+  createdAt: string;
+  updatedAt: string;
+  finishedAt: string | null;
+}
+
+export type WorldEditTargetKind = "entity" | "handler";
+export type WorldEditOp = "create" | "update" | "delete";
+
+/** A pending or applied structural edit emitted by an agent session */
+export interface WorldEditRecord {
+  seq: number;
+  gameId: string;
+  sessionId: string;
+  targetKind: WorldEditTargetKind;
+  targetId: string;
+  op: WorldEditOp;
+  /** JSON: full record (create), partial overlay w/ nulls (update), null (delete) */
+  payload: unknown;
+  /** Captured at commit time. Null until commit; null for create. */
+  priorState: unknown;
+  applied: boolean;
+  createdAt: string;
+}
+
+/** Input for appendWorldEdit — seq is assigned by storage */
+export type NewWorldEditRecord = Omit<WorldEditRecord, "seq" | "applied" | "priorState">;
+
 /** Known user roles */
 export type UserRole = "admin" | "ai" | "debug" | "player";
 
@@ -83,6 +131,26 @@ export interface RuntimeStorage {
   appendEvent(session: SessionKey, entry: EventLogEntry): Promise<void>;
   clearEvents(session: SessionKey): Promise<void>;
   popEvent(session: SessionKey): Promise<EventLogEntry | null>;
+
+  // --- Agent sessions ---
+  createAgentSession(record: AgentSessionRecord): Promise<void>;
+  getAgentSession(id: string): Promise<AgentSessionRecord | null>;
+  updateAgentSession(id: string, patch: Partial<AgentSessionRecord>): Promise<void>;
+  listAgentSessions(filter?: {
+    gameId?: string;
+    status?: AgentSessionStatus;
+  }): Promise<AgentSessionRecord[]>;
+
+  // --- World edits (the agent edit log) ---
+  appendWorldEdit(record: NewWorldEditRecord): Promise<WorldEditRecord>;
+  getSessionEdits(sessionId: string): Promise<WorldEditRecord[]>;
+  /**
+   * Atomically apply all pending edits in a session to the materialized
+   * ai_entities/ai_handlers tables, capture prior_state for each edit,
+   * mark them applied, and flip the session's status to 'finished' with
+   * the given summary.
+   */
+  commitSession(sessionId: string, summary: string): Promise<void>;
 
   // --- Conversations (shared world content) ---
   loadConversationEntries(gameId: string, npcId: string): Promise<WordEntryRecord[]>;

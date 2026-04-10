@@ -13,7 +13,12 @@ import type {
   ImageSettings,
   ImageSettingsInput,
   WorldImageRecord,
+  AgentSessionRecord,
+  AgentSessionStatus,
+  WorldEditRecord,
+  NewWorldEditRecord,
 } from "./storage.js";
+import { FileAgentStorage } from "./storage-file-agent.js";
 
 function ensureDir(filePath: string): void {
   const dir = dirname(filePath);
@@ -37,10 +42,12 @@ function appendJsonl(filePath: string, record: unknown): void {
 export class FileStorage implements RuntimeStorage {
   private dataDir: string;
   private userDataDir: string;
+  private agentStorage: FileAgentStorage;
 
   constructor({ dataDir, userDataDir }: { dataDir: string; userDataDir: string }) {
     this.dataDir = dataDir;
     this.userDataDir = userDataDir;
+    this.agentStorage = new FileAgentStorage(dataDir);
   }
 
   private path(...segments: string[]): string {
@@ -263,5 +270,33 @@ export class FileStorage implements RuntimeStorage {
     const path = this.worldImagesPath(gameId);
     if (!existsSync(path)) return [];
     return JSON.parse(readFileSync(path, "utf-8")) as WorldImageRecord[];
+  }
+
+  // --- Agent sessions ---
+  async createAgentSession(record: AgentSessionRecord): Promise<void> {
+    return this.agentStorage.createAgentSession(record);
+  }
+  async getAgentSession(id: string): Promise<AgentSessionRecord | null> {
+    return this.agentStorage.getAgentSession(id);
+  }
+  async updateAgentSession(id: string, patch: Partial<AgentSessionRecord>): Promise<void> {
+    return this.agentStorage.updateAgentSession(id, patch);
+  }
+  async listAgentSessions(filter?: {
+    gameId?: string;
+    status?: AgentSessionStatus;
+  }): Promise<AgentSessionRecord[]> {
+    return this.agentStorage.listAgentSessions(filter);
+  }
+
+  // --- World edits ---
+  async appendWorldEdit(record: NewWorldEditRecord): Promise<WorldEditRecord> {
+    return this.agentStorage.appendWorldEdit(record);
+  }
+  async getSessionEdits(sessionId: string): Promise<WorldEditRecord[]> {
+    return this.agentStorage.getSessionEdits(sessionId);
+  }
+  async commitSession(sessionId: string, summary: string): Promise<void> {
+    return this.agentStorage.commitSession(sessionId, summary);
   }
 }

@@ -4,10 +4,16 @@ import { executeCommand } from "./execute-command.js";
 import type { CommandResult } from "./execute-command.js";
 import { logErrorObj } from "./error-log.js";
 
+interface AgentProgressPayload {
+  turn: number;
+  toolCalls: Array<{ name: string; summary: string }>;
+}
+
 interface StreamEvent {
-  phase: "ai" | "done" | "error";
+  phase: "ai" | "agent-progress" | "done" | "error";
   result?: CommandResult;
   error?: string;
+  progress?: AgentProgressPayload;
 }
 
 export interface AuthenticatedUser {
@@ -45,6 +51,9 @@ export async function handleCommandStream(
               reinitGame: (s) => reinitGame(s),
               onAiStart() {
                 send({ phase: "ai" });
+              },
+              onAgentProgress(progress) {
+                send({ phase: "agent-progress", progress });
               },
             },
           );
@@ -98,6 +107,9 @@ export async function handleCommandStreamNode(
         reinitGame: (s) => reinitGame(s),
         onAiStart() {
           send({ phase: "ai" });
+        },
+        onAgentProgress(progress) {
+          send({ phase: "agent-progress", progress });
         },
       },
     );

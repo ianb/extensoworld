@@ -14,20 +14,19 @@ import type {
   ImageSettingsInput,
   WorldImageRecord,
   WorldImageQuery,
+  AgentSessionRecord,
+  AgentSessionStatus,
+  WorldEditRecord,
+  NewWorldEditRecord,
 } from "./storage.js";
-import type {
-  D1Database,
-  EntityRow,
-  HandlerRow,
-  EventRow,
-  ConversationRow,
-  UserRow,
-} from "./d1-types.js";
+import * as agentDb from "./storage-d1-agent.js";
+import type { D1Database, EntityRow, HandlerRow, EventRow, ConversationRow } from "./d1-types.js";
 import * as bugDb from "./storage-d1-bugs.js";
 import * as adminDb from "./storage-d1-admin.js";
 import * as imageDb from "./storage-d1-images.js";
 import * as errorDb from "./storage-d1-errors.js";
-import { userRowToRecord, rowToAuthoring, authoringBindValues } from "./d1-types.js";
+import * as userDb from "./storage-d1-users.js";
+import { rowToAuthoring, authoringBindValues } from "./d1-types.js";
 import { deserializeEntityRow, serializeEntityRecord } from "./entity-serialize.js";
 
 export type { D1Database } from "./d1-types.js";
@@ -228,54 +227,23 @@ export class D1Storage implements RuntimeStorage {
   }
 
   // --- Users ---
-
   async findUserByGoogleId(googleId: string): Promise<UserRecord | null> {
-    const row = await this.db
-      .prepare("SELECT * FROM users WHERE google_id = ?")
-      .bind(googleId)
-      .first<UserRow>();
-    return row ? userRowToRecord(row) : null;
+    return userDb.findUserByGoogleId(this.db, googleId);
   }
-
   async findUserById(id: string): Promise<UserRecord | null> {
-    const row = await this.db.prepare("SELECT * FROM users WHERE id = ?").bind(id).first<UserRow>();
-    return row ? userRowToRecord(row) : null;
+    return userDb.findUserById(this.db, id);
   }
-
   async findUserByName(name: string): Promise<UserRecord | null> {
-    const row = await this.db
-      .prepare("SELECT * FROM users WHERE display_name = ?")
-      .bind(name)
-      .first<UserRow>();
-    return row ? userRowToRecord(row) : null;
+    return userDb.findUserByName(this.db, name);
   }
-
   async hasAnyUsers(): Promise<boolean> {
-    return (await this.db.prepare("SELECT 1 FROM users LIMIT 1").first<{ 1: number }>()) !== null;
+    return userDb.hasAnyUsers(this.db);
   }
-
   async createUser(record: UserRecord): Promise<void> {
-    await this.db
-      .prepare(
-        "INSERT INTO users (id, display_name, email, google_id, roles, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      )
-      .bind(
-        record.id,
-        record.displayName,
-        record.email,
-        record.googleId,
-        JSON.stringify(record.roles),
-        record.createdAt,
-        record.lastLoginAt,
-      )
-      .run();
+    return userDb.createUser(this.db, record);
   }
-
   async updateLastLogin(userId: string): Promise<void> {
-    await this.db
-      .prepare("UPDATE users SET last_login_at = ? WHERE id = ?")
-      .bind(new Date().toISOString(), userId)
-      .run();
+    return userDb.updateLastLogin(this.db, userId);
   }
 
   async recordAiUsage(userId: string, callType: string): Promise<void> {
@@ -325,5 +293,33 @@ export class D1Storage implements RuntimeStorage {
   }
   async listWorldImages(gameId: string): Promise<WorldImageRecord[]> {
     return imageDb.listWorldImages(this.db, gameId);
+  }
+
+  // --- Agent sessions ---
+  async createAgentSession(record: AgentSessionRecord): Promise<void> {
+    return agentDb.createAgentSession(this.db, record);
+  }
+  async getAgentSession(id: string): Promise<AgentSessionRecord | null> {
+    return agentDb.getAgentSession(this.db, id);
+  }
+  async updateAgentSession(id: string, patch: Partial<AgentSessionRecord>): Promise<void> {
+    return agentDb.updateAgentSession(this.db, { id, patch });
+  }
+  async listAgentSessions(filter?: {
+    gameId?: string;
+    status?: AgentSessionStatus;
+  }): Promise<AgentSessionRecord[]> {
+    return agentDb.listAgentSessions(this.db, filter);
+  }
+
+  // --- World edits ---
+  async appendWorldEdit(record: NewWorldEditRecord): Promise<WorldEditRecord> {
+    return agentDb.appendWorldEdit(this.db, record);
+  }
+  async getSessionEdits(sessionId: string): Promise<WorldEditRecord[]> {
+    return agentDb.getSessionEdits(this.db, sessionId);
+  }
+  async commitSession(sessionId: string, summary: string): Promise<void> {
+    return agentDb.commitSession(this.db, { sessionId, summary });
   }
 }

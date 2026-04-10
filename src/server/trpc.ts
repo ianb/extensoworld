@@ -18,3 +18,18 @@ export const authedProcedure = t.procedure.use(async ({ ctx, next }) => {
   }
   return next({ ctx: { userId: ctx.userId, userName: ctx.userName!, roles: ctx.roles } });
 });
+
+/**
+ * Procedure that requires the caller to have the "ai" role. Used by agentic
+ * world-editing endpoints which can mutate the shared world. Layered on top
+ * of authedProcedure for the userId narrowing.
+ */
+export const aiRoleProcedure = authedProcedure.use(async ({ ctx, next }) => {
+  if (!ctx.roles.includes("ai")) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Requires the 'ai' role",
+    });
+  }
+  return next({ ctx });
+});

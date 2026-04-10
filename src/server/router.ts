@@ -3,17 +3,19 @@ import { router, publicProcedure, authedProcedure } from "./trpc.js";
 import { describeRoomFull } from "../core/index.js";
 import type { EntityStore } from "../core/index.js";
 import { recordToHandler } from "./handler-convert.js";
+import { applyAiEntityRecords } from "./apply-ai-records.js";
 import { applyEvents } from "./event-apply.js";
 import { getStorage } from "./storage-instance.js";
 import { composeVerbPrompt, composeCreatePrompt, composeConversationPrompt } from "./ai-prompts.js";
 import type { GameInstance } from "../games/registry.js";
 import { getGame, listGames, isValidGameId } from "../games/registry.js";
 import { executeCommand } from "./execute-command.js";
-import type { SessionKey, AiEntityRecord } from "./storage.js";
+import type { SessionKey } from "./storage.js";
 import { logErrorObj } from "./error-log.js";
 import { bugRouter } from "./router-bugs.js";
 import { adminRouter } from "./router-admin.js";
 import { imageRouter } from "./router-images.js";
+import { agentRouter } from "./router-agent.js";
 
 // Game registrations are imported by the entry point (server/index.ts or worker.ts)
 // NOT here, so the router can be used with either fs-based or bundled game data.
@@ -28,46 +30,6 @@ class GameNotFoundError extends Error {
   }
 }
 
-/** Apply AI entity records to the store (create or update) */
-function applyAiEntities(records: AiEntityRecord[], store: EntityStore): void {
-  for (const record of records) {
-    if (store.has(record.id)) {
-      const entity = store.get(record.id);
-      entity.name = record.name;
-      entity.description = record.description;
-      if (record.aliases) entity.aliases = record.aliases;
-      if (record.secret !== undefined) entity.secret = record.secret;
-      if (record.scenery) entity.scenery = record.scenery;
-      if (record.exit) entity.exit = record.exit;
-      if (record.room) entity.room = { ...entity.room, ...record.room } as typeof entity.room;
-      if (record.ai) entity.ai = record.ai;
-      if (record.properties) {
-        for (const [key, value] of Object.entries(record.properties)) {
-          if (value === null) {
-            store.removeProperty(record.id, key);
-          } else {
-            store.setProperty(record.id, { name: key, value });
-          }
-        }
-      }
-    } else {
-      store.create(record.id, {
-        tags: record.tags,
-        name: record.name,
-        description: record.description,
-        location: record.location,
-        aliases: record.aliases,
-        secret: record.secret,
-        scenery: record.scenery,
-        exit: record.exit,
-        room: record.room,
-        ai: record.ai,
-        properties: record.properties,
-      });
-    }
-  }
-}
-
 /** Create a fresh game instance for a specific user */
 async function initGame(session: SessionKey): Promise<GameInstance> {
   const def = getGame(session.gameId);
@@ -76,7 +38,7 @@ async function initGame(session: SessionKey): Promise<GameInstance> {
   const storage = getStorage();
   // AI entities and handlers are shared across all users
   const aiEntities = await storage.loadAiEntities(session.gameId);
-  applyAiEntities(aiEntities, instance.store);
+  applyAiEntityRecords(aiEntities, instance.store);
   instance.store.snapshot();
   // Mark the starting room as visited so the map includes it
   const startPlayer = instance.store.findByTag("player")[0];
@@ -291,6 +253,7 @@ export const appRouter = router({
   ...bugRouter._def.procedures,
   ...adminRouter._def.procedures,
   ...imageRouter._def.procedures,
+  ...agentRouter._def.procedures,
 });
 
 export type AppRouter = typeof appRouter;
