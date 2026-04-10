@@ -125,7 +125,7 @@ export function WorldShell({
   const [generatingImages, setGeneratingImages] = useState<Record<string, boolean>>({});
   const [imageVersions, setImageVersions] = useState<Record<string, number>>({});
   const logEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const refreshImageStatus = useCallback(
     (text: string) =>

@@ -1,3 +1,4 @@
+import TextareaAutosize from "react-textarea-autosize";
 import type { DebugData } from "./DebugView.js";
 import type { BugPreviewData } from "./BugReportView.js";
 import { HighlightedText } from "./HighlightedText.js";
@@ -168,21 +169,28 @@ export function ShellInput({
   setInput: (v: string) => void;
   loading: boolean;
   conversationMode: boolean;
-  inputRef: React.RefObject<HTMLInputElement | null>;
+  inputRef: React.RefObject<HTMLTextAreaElement | null>;
   onSubmit: (e: React.FormEvent) => void;
 }) {
   return (
     <form
       onSubmit={onSubmit}
-      className={`flex gap-2 rounded-b-lg p-2 ${conversationMode ? "border-x border-b border-convo/50 bg-page" : "bg-surface"}`}
+      className={`flex items-end gap-2 rounded-b-lg p-2 ${conversationMode ? "border-x border-b border-convo/50 bg-page" : "bg-surface"}`}
     >
-      <input
+      <TextareaAutosize
         ref={inputRef}
-        type="text"
         value={input}
         onChange={(e) => setInput(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            onSubmit(e);
+          }
+        }}
         placeholder={conversationMode ? "Say a topic word..." : "Enter command..."}
-        className={`flex-1 rounded border px-3 py-2 font-mono text-sm text-content focus:outline-none ${
+        enterKeyHint="send"
+        minRows={1}
+        className={`flex-1 resize-none rounded border px-3 py-2 font-mono text-sm text-content focus:outline-none ${
           conversationMode
             ? "border-convo/50 bg-page placeholder-convo/40 focus:border-convo"
             : "border-content/15 bg-surface placeholder-content/40 focus:border-accent"
