@@ -16,6 +16,8 @@ import type { RuntimeStorage, WorldEditRecord } from "./storage.js";
 export interface ToolContext {
   storage: RuntimeStorage;
   gameId: string;
+  /** Human user who owns the session — used to scope per-user reads like loadEvents. */
+  userId: string;
   sessionId: string;
   store: EntityStore;
   verbs: VerbRegistry;

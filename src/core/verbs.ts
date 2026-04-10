@@ -44,6 +44,16 @@ export class VerbRegistry {
     return true;
   }
 
+  /** Return a defensive copy of all registered handlers. */
+  list(): VerbHandler[] {
+    return [...this.handlers];
+  }
+
+  /** Find a handler by its unique name. */
+  getByName(name: string): VerbHandler | null {
+    return this.handlers.find((h) => h.name === name) || null;
+  }
+
   dispatch(context: VerbContext): DispatchResult {
     const candidates = this.findHandlers(context);
     const applicable = candidates.filter((h) => {

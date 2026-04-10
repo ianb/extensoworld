@@ -9,6 +9,7 @@ import { applyAiEntityRecords } from "./apply-ai-records.js";
 import { recordToHandler } from "./handler-convert.js";
 import { buildAgentTools } from "./agent-tools.js";
 import { buildAgentSystemPrompt } from "./agent-system-prompt.js";
+import { buildSessionContextMessage } from "./agent-session-context.js";
 import type { ToolContext } from "./agent-tool-context.js";
 import type { AgentSessionRecord, AgentSessionStatus } from "./storage.js";
 
@@ -102,6 +103,7 @@ export async function tickSession(
   const context: ToolContext = {
     storage,
     gameId: session.gameId,
+    userId: session.userId,
     sessionId: session.id,
     store: game.store,
     verbs: game.verbs,
@@ -124,11 +126,20 @@ export async function tickSession(
     prompts: game.prompts,
   });
 
-  const messages: ModelMessage[] = (
+  const messages: ModelMessage[] =
     session.messages.length > 0
       ? (session.messages as ModelMessage[])
-      : [{ role: "user", content: session.request }]
-  ) as ModelMessage[];
+      : [
+          {
+            role: "user",
+            content: await buildSessionContextMessage(game.store, {
+              storage,
+              gameId: session.gameId,
+              userId: session.userId,
+              request: session.request,
+            }),
+          },
+        ];
 
   const model = options && options.model ? options.model : getLlm();
   const stepBudget = options && options.maxStepsPerTick ? options.maxStepsPerTick : 30;
